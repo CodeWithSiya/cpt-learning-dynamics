@@ -79,11 +79,9 @@ def log_dataset_info(dataset: DatasetDict) -> None:
     logger.info(f"Train samples: {len(dataset['train']):,}")
     logger.info(f"Validation samples: {len(dataset['validation']):,}")
 
-    # Log the first sample to confirm field names and content
+    # Log the first sample to confirm field names
     sample = dataset["train"][0]
     logger.info(f"Sample fields: {list(sample.keys())}")
-    logger.info(f"Sample headline: {sample['headline']}")
-    logger.info(f"Sample content (first 200 chars): {sample['content'][:200]}")
 
 def save_dataset(dataset: DatasetDict, output_dir: str) -> None:
     """
