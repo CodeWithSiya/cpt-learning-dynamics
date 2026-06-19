@@ -219,3 +219,10 @@ __marimo__/
 
 # Environment Variables
 .env
+
+# Datasets
+datasets/corpus
+datasets/eval
+
+# Hugging Face cache
+.cache/
