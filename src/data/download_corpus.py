@@ -7,17 +7,22 @@ Dataset: https://huggingface.co/datasets/castorini/wura
 import argparse
 import logging
 import os
+from dotenv import load_dotenv
 from argparse import Namespace
 from typing import cast, Optional
 
 from datasets import DatasetDict, load_dataset
-
+from huggingface_hub import get_token
+  
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Load environment variables
+load_dotenv()
 
 # WURA dataset constants
 DATASET_NAME = "castorini/wura"
@@ -59,11 +64,19 @@ def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
     """
     logger.info(f"Loading {DATASET_NAME} ({language})...")
 
+    # Try to get HF token
+    token = get_token()
+    if token:
+        logger.info("Using HuggingFace authentication")
+    else:
+        logger.info("No HuggingFace token found, proceeding without authentication")
+
     dataset = cast(DatasetDict, load_dataset(
         path=DATASET_NAME,
         name=language,
         trust_remote_code=True,
         cache_dir=cache_dir,
+        token=token,
         verification_mode="no_checks"
     ))
 

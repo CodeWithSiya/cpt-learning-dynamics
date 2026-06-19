@@ -10,11 +10,16 @@ Datasets:
 import argparse
 import logging
 import os
+from dotenv import load_dotenv
 from argparse import Namespace
 from dataclasses import dataclass
 from typing import cast, Optional
 
 from datasets import DatasetDict, load_dataset
+from huggingface_hub import get_token
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -101,11 +106,19 @@ def load_eval_dataset(task_name: str, config: EvalTaskConfig, language: str, cac
     """
     logger.info(f"Loading {config.description} ({language})...")
 
+    # Try to get HF token
+    token = get_token()
+    if token:
+        logger.info("Using HuggingFace authentication")
+    else:
+        logger.info("No HuggingFace token found, proceeding without authentication")
+
     dataset = cast(DatasetDict, load_dataset(
         path=config.dataset_name,
         name=language,
         trust_remote_code=config.trust_remote_code,
         cache_dir=cache_dir,
+        token=token,
         verification_mode="no_checks"
     ))
 
