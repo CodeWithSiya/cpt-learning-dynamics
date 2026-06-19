@@ -1,5 +1,5 @@
 """
-Download the WURA isiXhosa corpus from Hugging Face for CPT.
+Download the WURA isiXhosa corpus from HuggingFace for CPT.
 
 Dataset: https://huggingface.co/datasets/castorini/wura
 """
@@ -26,7 +26,7 @@ SUPPORTED_LANGUAGES = ["xho"]
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Download the WURA isiXhosa corpus from Hugging Face."
+        description="Download the WURA isiXhosa corpus from HuggingFace."
     )
     parser.add_argument(
         "--output_dir",
