@@ -8,9 +8,12 @@
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
 
+# Load environment variables from .env
+set -a
+source /home/mdnsiy014/cpt-learning-dynamics/.env
+set +a
+
 # Redirect HuggingFace cache to scratch
-export HF_TOKEN="${HF_TOKEN}"
-export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
 mkdir -p "${HF_HOME}"
 
