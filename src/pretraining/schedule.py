@@ -25,7 +25,7 @@ class CheckpointScheduleConfig:
     save_initial_checkpoint: bool = True   # save model at step 0
 
     def __post_init__(self) -> None:
-        """Validate that schedule percentages are sensible."""
+        """Validate configuration values after construction."""
         if not 0 < self.initial_phase_ratio < 1:
             raise ValueError(f"initial_phase_ratio must be in (0, 1), got {self.initial_phase_ratio}")
         if not 0 < self.initial_interval_ratio <= self.initial_phase_ratio:
@@ -39,7 +39,7 @@ def compute_checkpoint_steps(total_steps: int, config: Optional[CheckpointSchedu
 
     :param total_steps: Total number of training steps.
     :param config: Checkpoint schedule configuration. Uses default two-phase schedule if not provided.
-    :returns checkpoint_steps: Sorted list of steps at which to save checkpoints.
+    :return: Sorted list of steps at which to save checkpoints.
     """
     if total_steps <= 0: 
         raise ValueError(f"total_steps must be positive, got {total_steps}")
