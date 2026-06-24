@@ -7,6 +7,11 @@
 #SBATCH --job-name="download-data"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --output=logs/download_%j.log
+#SBATCH --error=logs/download_%j.log
+
+# Suppress uv hardlink warning
+export UV_LINK_MODE=copy
 
 # Load environment variables from .env
 set -a
