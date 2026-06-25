@@ -226,3 +226,6 @@ datasets/eval
 
 # Hugging Face cache
 .cache/
+
+# Logs
+logs
