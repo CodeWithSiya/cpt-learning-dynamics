@@ -13,7 +13,7 @@
 #SBATCH --output=logs/pretrain_%j.log
 #SBATCH --error=logs/pretrain_%j.log
 
-# Suppress uv hardlink warning
+# Sress uv hardlink warning
 export UV_LINK_MODE=copy
 
 # Load environment variables from .env
@@ -36,5 +36,5 @@ accelerate launch \
     --mixed_precision bf16 \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
     src/pretraining/pretrain.py \
-    --config configs/models/xlmr.yaml \
+    --config config/models/xlmr.yaml \
     --corpus datasets/corpus/xho
