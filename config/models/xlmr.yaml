@@ -5,7 +5,7 @@ max_seq_length: 512
 # Training Configuration
 learning_rate: 5.0e-5
 batch_size: 80
-total_steps: 600000
+total_steps: 10
 warmup_steps: 0
 
 # Checkpointing Configuration
