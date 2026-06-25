@@ -102,7 +102,7 @@ def load_eval_dataset(task_name: str, config: EvalTaskConfig, language: str, cac
     :param config: EvalTaskConfig for this task.
     :param language: Language subset to download.
     :param cache_dir: HuggingFace cache directory.
-    :returns DatasetDict: DatasetDict with train, validation and test splits.
+    :return: DatasetDict with train, validation and test splits.
     """
     logger.info(f"Loading {config.description} ({language})...")
 

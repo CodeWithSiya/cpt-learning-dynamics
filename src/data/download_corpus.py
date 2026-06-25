@@ -60,7 +60,7 @@ def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
     
     :param language: WURA language subset to download.
     :param cache_dir: Path to the HuggingFace cache directory.
-    :returns DatasetDict: Dataset with 'train' and 'validation' splits.
+    :return: Dataset with 'train' and 'validation' splits.
     """
     logger.info(f"Loading {DATASET_NAME} ({language})...")
 
@@ -91,10 +91,6 @@ def log_dataset_info(dataset: DatasetDict) -> None:
     logger.info(f"Dataset structure: {dataset}")
     logger.info(f"Train samples: {len(dataset['train']):,}")
     logger.info(f"Validation samples: {len(dataset['validation']):,}")
-
-    # Log the first sample to confirm field names
-    sample = dataset["train"][0]
-    logger.info(f"Sample fields: {list(sample.keys())}")
 
 def save_dataset(dataset: DatasetDict, output_dir: str) -> None:
     """

@@ -1,0 +1,18 @@
+# Model Configuration
+model_name_or_path: "francois-meyer/nguni-xlmr-large"
+max_seq_length: 512
+
+# Training Configuration
+learning_rate: 5.0e-5
+batch_size: 80
+total_steps: 600000
+warmup_steps: 0
+
+# Checkpointing Configuration
+output_dir: "results/nguni-xlmr"
+checkpoint_schedule:
+  save_initial_checkpoint: true
+
+# Experiment Tracking
+wandb_project: "cpt-learning-dynamics"
+wandb_run_name: "nguni-xlmr-xho"
