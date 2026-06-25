@@ -2,8 +2,7 @@
 
 #SBATCH --account=compsci
 #SBATCH --partition=ada
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=02:00:00
 #SBATCH --job-name="cpt-preprocess"
@@ -11,6 +10,10 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --output=logs/preprocess_%j.log
 #SBATCH --error=logs/preprocess_%j.log
+
+# Update to latest commit
+git pull
+git log -l
 
 # Suppress uv hardlink warning
 export UV_LINK_MODE=copy
@@ -32,7 +35,7 @@ uv sync --frozen
 # Preprocess train split 
 uv run python src/data/preprocess.py \
     --input datasets/corpus/xho \
-    --config config/models/xlmr.yaml \
+    --config configs/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/train \
     --split train \
     --nproc ${SLURM_CPUS_PER_TASK}
@@ -40,7 +43,7 @@ uv run python src/data/preprocess.py \
 # Preprocess validation split 
 uv run python src/data/preprocess.py \
     --input datasets/corpus/xho \
-    --config config/models/xlmr.yaml \
+    --config configs/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/validation \
     --split validation \
     --nproc ${SLURM_CPUS_PER_TASK}

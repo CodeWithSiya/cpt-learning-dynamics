@@ -4,11 +4,15 @@
 #SBATCH --partition=ada
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --time=00:10:00
-#SBATCH --job-name="download-data"
+#SBATCH --job-name="cpt-download"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --output=logs/download_%j.log
 #SBATCH --error=logs/download_%j.log
+
+# Update to latest commit
+git pull
+git log -l
 
 # Suppress uv hardlink warning
 export UV_LINK_MODE=copy
