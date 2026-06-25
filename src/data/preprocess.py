@@ -8,7 +8,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from datasets import Dataset, load_from_disk
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from transformers import AutoTokenizer, PreTrainedTokenizerBase, logging as hf_logging
 
 from src.pretraining.config import ModelConfig
 
@@ -88,6 +88,8 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
             for i in range(0, total_length, block_size):
                 result[k].append(v[i: i + block_size])
         return result
+    
+    hf_logging.set_verbosity_error()
 
     logger.info(f"Tokenizing {len(dataset):,} documents...")
     tokenized = dataset.map(
@@ -97,6 +99,8 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
         num_proc=num_proc,
         desc="Tokenising documents"
     )
+
+    hf_logging.set_verbosity_warning()
 
     logger.info(f"Chunking into blocks of {block_size} tokens...")
     chunked = tokenized.map(
