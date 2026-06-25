@@ -32,7 +32,7 @@ uv sync --frozen
 # Preprocess train split 
 uv run python src/data/preprocess.py \
     --input datasets/corpus/xho \
-    --config configs/models/xlmr.yaml \
+    --config config/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/train \
     --split train \
     --nproc ${SLURM_CPUS_PER_TASK}
@@ -40,7 +40,7 @@ uv run python src/data/preprocess.py \
 # Preprocess validation split 
 uv run python src/data/preprocess.py \
     --input datasets/corpus/xho \
-    --config configs/models/xlmr.yaml \
+    --config config/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/validation \
     --split validation \
     --nproc ${SLURM_CPUS_PER_TASK}
