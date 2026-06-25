@@ -16,6 +16,8 @@ from argparse import Namespace
 from typing import cast
 from pathlib import Path
 
+import torch
+
 from datasets import Dataset, load_from_disk
 from transformers import (
     AutoModelForMaskedLM,
@@ -32,9 +34,10 @@ from transformers import (
 from src.pretraining.config import ModelConfig
 from src.pretraining.schedule import compute_checkpoint_steps
 
-# Constant Values
+# Constant Values (MLM probability from Devlin et al. [2018])
 RANDOM_SEED = 42
-MLM_PROBABILITY = 0.15  # Devlin et al. (2018)
+MLM_PROBABILITY = 0.15
+IS_GPU_AVAILABLE = torch.cuda.is_available()
 
 class ProgressCallback(TrainerCallback):
     """Log training loss at each logging step."""
@@ -159,8 +162,9 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
         run_name=config.wandb_run_name if config.wandb_project else None,
         logging_strategy="steps",
         logging_steps=10,
-        bf16= True,
-        dataloader_pin_memory=False
+        bf16= IS_GPU_AVAILABLE,
+        dataloader_pin_memory=IS_GPU_AVAILABLE,
+        use_cpu=not IS_GPU_AVAILABLE
     )
 
     # Model Training
@@ -192,8 +196,11 @@ def main() -> None:
     load_dotenv()
     args = parse_args()
 
-    # Reproducibility
+    # Reproducibility configuration and device checks
     set_reproducibility()
+    print(f"GPU available: {IS_GPU_AVAILABLE}", flush=True)
+    if IS_GPU_AVAILABLE:
+        print(f"GPU: {torch.cuda.get_device_name(0)}", flush=True)
 
     # Load model configuration and launch CPT run
     config = ModelConfig.from_yaml(args.config)
