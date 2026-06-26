@@ -9,7 +9,7 @@ total_steps: 600000
 warmup_steps: 0
 
 # Checkpointing Configuration
-output_dir: "/home/mdnsiy014/scratch/results/xlmr"
+output_dir: "/home/mdnsiy014/scratch/results/nguni-xlmr"
 checkpoint_schedule:
   save_initial_checkpoint: true
 
