@@ -4,7 +4,7 @@ max_seq_length: 512
 
 # Training Configuration
 learning_rate: 5.0e-5
-batch_size: 80
+batch_size: 4
 total_steps: 10
 warmup_steps: 0
 
