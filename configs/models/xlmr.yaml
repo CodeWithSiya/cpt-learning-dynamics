@@ -5,14 +5,15 @@ max_seq_length: 512
 # Training Configuration
 learning_rate: 5.0e-5
 batch_size: 4
-total_steps: 10
+total_steps: 100
 warmup_steps: 0
 
 # Checkpointing Configuration
-output_dir: "/home/mdnsiy014/scratch/results/xlmr"
+output_dir: "/home/mdnsiy014/scratch/cpt-learning-dynamics/results/xlmr"
 checkpoint_schedule:
   save_initial_checkpoint: true
 
 # Experiment Tracking
 wandb_project: "cpt-learning-dynamics"
 wandb_run_name: "xlmr-xho"
+logging_steps: 10
