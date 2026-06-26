@@ -9,10 +9,11 @@ total_steps: 600000
 warmup_steps: 0
 
 # Checkpointing Configuration
-output_dir: "/home/mdnsiy014/scratch/results/roberta"
+output_dir: "/home/mdnsiy014/scratch/cpt-learning-dynamics/results/roberta"
 checkpoint_schedule:
   save_initial_checkpoint: true
 
 # Experiment Tracking
 wandb_project: "cpt-learning-dynamics"
 wandb_run_name: "roberta-xho"
+logging_steps: 10

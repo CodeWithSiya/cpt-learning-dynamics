@@ -10,7 +10,6 @@ The script performs the following tasks:
 import os
 import argparse
 import json
-import torch
 from dotenv import load_dotenv
 from argparse import Namespace
 from typing import cast
@@ -149,6 +148,10 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
     checkpoint_dir = output_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+    # Configure Weights and Biases for CPT tracking 
+    if config.wandb_project:
+        os.environ["WANDB_PROJECT"] = config.wandb_project
+
     # Training Arguments (Checkpointing handled by CheckpointScheduleCallBack)
     training_args = TrainingArguments(
         output_dir=str(checkpoint_dir),
@@ -161,7 +164,7 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
         report_to="wandb" if config.wandb_project else "none",
         run_name=config.wandb_run_name if config.wandb_project else None,
         logging_strategy="steps",
-        logging_steps=10,
+        logging_steps=config.logging_steps,
         bf16= IS_GPU_AVAILABLE,
         dataloader_pin_memory=IS_GPU_AVAILABLE,
         use_cpu=not IS_GPU_AVAILABLE
@@ -185,7 +188,7 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
     trainer.train()
 
     # Save final model and log history
-    trainer.save_model(str(checkpoint_dir / "final"))
+    trainer.save_model(str(checkpoint_dir / f"step-{total_steps}"))
     with open(output_dir / "log_history.json", "w") as f:
         json.dump(trainer.state.log_history, f, indent=2)
 

@@ -35,6 +35,7 @@ class ModelConfig:
     checkpoint_schedule: CheckpointScheduleConfig
     wandb_project: Optional[str] = None
     wandb_run_name: Optional[str] = None
+    logging_steps: int = 10
 
     def __post_init__(self) -> None:
         """Validate configuration values after construction."""
