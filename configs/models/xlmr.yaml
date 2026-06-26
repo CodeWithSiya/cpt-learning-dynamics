@@ -9,7 +9,7 @@ total_steps: 10
 warmup_steps: 0
 
 # Checkpointing Configuration
-output_dir: "results/xlmr"
+output_dir: "/home/mdnsiy014/scratch/results/xlmr"
 checkpoint_schedule:
   save_initial_checkpoint: true
 
