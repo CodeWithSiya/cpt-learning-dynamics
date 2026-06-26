@@ -22,7 +22,9 @@ set -a
 source /home/mdnsiy014/cpt-learning-dynamics/.env
 set +a
 
-# Redirect HuggingFace cache to scratch
+# HPC paths
+export SCRATCH=/home/mdnsiy014/scratch
+export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
 mkdir -p "${HF_HOME}"
 
