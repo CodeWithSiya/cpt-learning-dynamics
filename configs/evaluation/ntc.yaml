@@ -1,5 +1,6 @@
 # Task Configuration
 task_name: "ntc"
+task_type: "sequence_classification"
 dataset_path: "datasets/evaluation/ntc"
 
 # Dataset Fields
