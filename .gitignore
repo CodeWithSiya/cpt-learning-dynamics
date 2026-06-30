@@ -222,7 +222,7 @@ __marimo__/
 
 # Datasets
 datasets/corpus
-datasets/eval
+datasets/evaluation
 
 # HuggingFace cache
 .cache/

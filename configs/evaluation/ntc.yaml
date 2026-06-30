@@ -1,0 +1,21 @@
+# Task Configuration
+task_name: "ntc"
+dataset_path: "datasets/evaluation/ntc"
+
+# Dataset Fields
+input_field: "text"
+label_field: "category"
+
+# Label Configuration
+label_names:
+  - "business"
+  - "entertainment"
+  - "health"
+  - "politics"
+  - "sports"
+
+# Training Configuration
+learning_rate: 5.0e-5
+epochs: 20
+batch_size: 32
+warmup_steps: 0

@@ -1,0 +1,34 @@
+# Task Configuration
+task_name: "pos"
+dataset_path: "datasets/evaluation/pos"
+
+# Dataset Fields
+input_field: "tokens"
+label_field: "upos"
+
+# Label Configuration
+label_names:
+  - "NOUN"
+  - "PUNCT"
+  - "ADP"
+  - "NUM"
+  - "SYM"
+  - "SCONJ"
+  - "ADJ"
+  - "PART"
+  - "DET"
+  - "CCONJ"
+  - "PROPN"
+  - "PRON"
+  - "X"
+  - "_"
+  - "ADV"
+  - "INTJ"
+  - "VERB"
+  - "AUX"
+
+# Training Configuration
+learning_rate: 5.0e-5
+epochs: 20
+batch_size: 32
+warmup_steps: 0

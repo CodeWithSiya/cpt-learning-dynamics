@@ -1,0 +1,25 @@
+# Task Configuration
+task_name: "ner"
+dataset_path: "datasets/evaluation/ner"
+
+# Dataset Fields
+input_field: "tokens"
+label_field: "ner_tags"
+
+# Label Configuration
+label_names:
+  - "O"
+  - "B-PER"
+  - "I-PER"
+  - "B-ORG"
+  - "I-ORG"
+  - "B-LOC"
+  - "I-LOC"
+  - "B-DATE"
+  - "I-DATE"
+
+# Training Configuration
+learning_rate: 5.0e-5
+epochs: 20
+batch_size: 32
+warmup_steps: 0
