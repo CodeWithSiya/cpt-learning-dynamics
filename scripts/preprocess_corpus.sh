@@ -35,7 +35,7 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # Preprocess train split 
-uv run python src/data/preprocess.py \
+uv run python src/data/preprocess_corpus.py \
     --input datasets/corpus/xho \
     --config configs/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/train \
@@ -43,7 +43,7 @@ uv run python src/data/preprocess.py \
     --nproc ${SLURM_CPUS_PER_TASK}
 
 # Preprocess validation split 
-uv run python src/data/preprocess.py \
+uv run python src/data/preprocess_corpus.py \
     --input datasets/corpus/xho \
     --config configs/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/validation \
