@@ -224,8 +224,11 @@ __marimo__/
 datasets/corpus
 datasets/eval
 
-# Hugging Face cache
+# HuggingFace cache
 .cache/
 
 # Logs
 logs
+
+# Weights and Biases cache
+wandb
