@@ -63,6 +63,7 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
     :param dataset: HuggingFace Dataset with "headline" and "content" columns.
     :param tokenizer: Tokenizer matching the model being pretrained.
     :param block_size: Fixed chunk length.
+    :param num_proc: Number of processes used for preprocessing.
     :return: Dataset of fixed-length token id chunks.
     """
     def _tokenize(examples: dict[str, list[str]]):

@@ -41,4 +41,4 @@ uv run python src/data/download_corpus.py \
 # Download all evaluation datasets
 uv run python src/data/download_eval_data.py \
     --language xho \
-    --output_dir datasets/eval
+    --output_dir datasets/evaluation

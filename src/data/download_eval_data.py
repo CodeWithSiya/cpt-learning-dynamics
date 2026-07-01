@@ -83,7 +83,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="datasets/eval",
+        default="datasets/evaluation",
         help="Root directory to save evaluation datasets."
     )
     parser.add_argument(
