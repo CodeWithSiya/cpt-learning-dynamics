@@ -103,7 +103,7 @@ def parse_args() -> Namespace:
         description="Run continued pretraining for a single model config."
     )
     parser.add_argument(
-        "--config", 
+        "--model-config", 
         type=str, 
         required=True, 
         help="Path to model YAML config."

@@ -81,13 +81,13 @@ def parse_args() -> Namespace:
         help="Language subset to download. Default: xho (isiXhosa)."
     )
     parser.add_argument(
-        "--output_dir",
+        "--output-dir",
         type=str,
         default="datasets/evaluation",
         help="Root directory to save evaluation datasets."
     )
     parser.add_argument(
-        "--cache_dir",
+        "--cache-dir",
         type=str,
         default=None,
         help="HuggingFace cache directory."

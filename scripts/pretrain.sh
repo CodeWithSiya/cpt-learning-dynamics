@@ -1,9 +1,8 @@
 #!/bin/bash
 
-#SBATCH --account=compsci
-#SBATCH --partition=ada
-#SBATCH --nodes=1 --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --account=l40sfree
+#SBATCH --partition=l40s
+#SBATCH --nodes=1 --ntasks=1 --gres=gpu:l40s:1
 #SBATCH --time=01:00:00
 #SBATCH --job-name="cpt-pretrain"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
@@ -31,6 +30,10 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # Run continued pretraining (CPT)
-uv run python src/pretraining/pretrain.py \
-    --config configs/models/xlmr.yaml \
-    --corpus datasets/processed/xlmr/xho/train
+accelerate launch \
+    --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+    --mixed_precision bf16 \
+    --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
+    src/pretraining/pretrain.py \
+    --model-config config/models/xlmr.yaml \
+    --corpus datasets/corpus/xho

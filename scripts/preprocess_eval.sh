@@ -5,11 +5,11 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=01:00:00
-#SBATCH --job-name="cpt-preprocess-corpus"
+#SBATCH --job-name="cpt-preprocess-eval"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/preprocess_corpus_%j.log
-#SBATCH --error=logs/preprocess_corpus_%j.log
+#SBATCH --output=logs/preprocess_eval_%j.log
+#SBATCH --error=logs/preprocess_eval_%j.log
 
 # Update to latest commit
 git pull
@@ -34,19 +34,26 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# Preprocess train split 
-uv run python src/data/preprocess_corpus.py \
-    --input datasets/corpus/xho \
+# Preprocess NER evaluation dataset
+uv run python src/data/preprocess_eval.py \
     --model-config configs/models/xlmr.yaml \
+    --eval-config configs/eval/ner.yaml \
     --language xho \
-    --output datasets/processed/xlmr/xho/train \
-    --split train \
+    --output datasets/eval/processed/xlmr/xho/ner \
     --nproc ${SLURM_CPUS_PER_TASK}
 
-# Preprocess validation split 
-uv run python src/data/preprocess_corpus.py \
-    --input datasets/corpus/xho \
+# Preprocess POS evaluation dataset
+uv run python src/data/preprocess_eval.py \
     --model-config configs/models/xlmr.yaml \
-    --output datasets/processed/xlmr/xho/validation \
-    --split validation \
+    --eval-config configs/eval/pos.yaml \
+    --language xho \
+    --output datasets/eval/processed/xlmr/xho/pos \
+    --nproc ${SLURM_CPUS_PER_TASK}
+
+# Preprocess NTC evaluation dataset
+uv run python src/data/preprocess_eval.py \
+    --model-config configs/models/xlmr.yaml \
+    --eval-config configs/eval/ntc.yaml \
+    --language xho \
+    --output datasets/eval/processed/xlmr/xho/ntc \
     --nproc ${SLURM_CPUS_PER_TASK}

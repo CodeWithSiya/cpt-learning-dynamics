@@ -31,10 +31,16 @@ def parse_args() -> Namespace:
         help="Path to the raw corpus on disk, as saved by download_corpus.py.",
     )
     parser.add_argument(
-        "--config",
+        "--model-config",
         type=str,
         required=True,
         help="Path to the model YAML config (provides tokenizer and max_seq_length).",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="xho",
+        help="Language subset to preprocess. Default: xho (isiXhosa)."
     )
     parser.add_argument(
         "--output",
