@@ -125,7 +125,7 @@ def main() -> None:
     args = parse_args()
 
     # Load the model configuration settings
-    config = ModelConfig.from_yaml(args.config)
+    config = ModelConfig.from_yaml(args.model_config)
     logger.info(f"Loaded config for {config.model_name_or_path} (max_seq_length={config.max_seq_length})")
 
     # Initialise the model's tokenizer
