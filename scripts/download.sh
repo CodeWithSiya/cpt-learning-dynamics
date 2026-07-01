@@ -3,8 +3,8 @@
 #SBATCH --account=compsci
 #SBATCH --partition=ada
 #SBATCH --nodes=1 --ntasks=1
-#SBATCH --time=00:10:00
-#SBATCH --job-name="cpt-download"
+#SBATCH --time=01:00:00
+#SBATCH --job-name="cpt-download-data"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --output=logs/download_%j.log
@@ -36,9 +36,9 @@ uv sync --frozen
 # Download WURA isiXhosa corpus
 uv run python src/data/download_corpus.py \
     --language xho \
-    --output_dir datasets/corpus
+    --output-dir datasets/corpus
 
 # Download all evaluation datasets
 uv run python src/data/download_eval_data.py \
     --language xho \
-    --output_dir datasets/evaluation
+    --output-dir datasets/evaluation

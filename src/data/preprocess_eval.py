@@ -40,13 +40,13 @@ def parse_args() -> Namespace:
         description="Preprocess evaluation datasets for downstream fine-tuning."
     )
     parser.add_argument(
-        "--model_config",
+        "--model-config",
         type=str,
         required=True,
         help="Path to model YAML config (provides model_name_or_path and max_seq_length)."
     )
     parser.add_argument(
-        "--eval_config",
+        "--eval-config",
         type=str,
         required=True,
         help="Path to evaluation task YAML config."

@@ -32,5 +32,5 @@ uv sync --frozen
 
 # Run continued pretraining (CPT)
 uv run python src/pretraining/pretrain.py \
-    --config configs/models/xlmr.yaml \
+    --model-config configs/models/xlmr.yaml \
     --corpus datasets/processed/xlmr/xho/train

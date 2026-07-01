@@ -34,13 +34,13 @@ def parse_args() -> Namespace:
         description="Download the WURA isiXhosa corpus from HuggingFace."
     )
     parser.add_argument(
-        "--output_dir",
+        "--output-dir",
         type=str,
         default="datasets/corpus",
         help="Directory to save the downloaded dataset to disk."
     )
     parser.add_argument(
-        "--cache_dir",
+        "--cache-dir",
         type=str,
         default=None,
         help="HuggingFace cache directory for downloaded files. "

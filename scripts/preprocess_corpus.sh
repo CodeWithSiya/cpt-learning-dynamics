@@ -4,12 +4,12 @@
 #SBATCH --partition=ada
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=02:00:00
-#SBATCH --job-name="cpt-preprocess"
+#SBATCH --time=01:00:00
+#SBATCH --job-name="cpt-preprocess-corpus"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/preprocess_%j.log
-#SBATCH --error=logs/preprocess_%j.log
+#SBATCH --output=logs/preprocess_corpus_%j.log
+#SBATCH --error=logs/preprocess_corpus_%j.log
 
 # Update to latest commit
 git pull
@@ -37,7 +37,8 @@ uv sync --frozen
 # Preprocess train split 
 uv run python src/data/preprocess_corpus.py \
     --input datasets/corpus/xho \
-    --config configs/models/xlmr.yaml \
+    --model-config configs/models/xlmr.yaml \
+    --language xho \
     --output datasets/processed/xlmr/xho/train \
     --split train \
     --nproc ${SLURM_CPUS_PER_TASK}
@@ -45,7 +46,7 @@ uv run python src/data/preprocess_corpus.py \
 # Preprocess validation split 
 uv run python src/data/preprocess_corpus.py \
     --input datasets/corpus/xho \
-    --config configs/models/xlmr.yaml \
+    --model-config configs/models/xlmr.yaml \
     --output datasets/processed/xlmr/xho/validation \
     --split validation \
     --nproc ${SLURM_CPUS_PER_TASK}
