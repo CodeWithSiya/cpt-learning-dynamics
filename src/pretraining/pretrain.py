@@ -165,7 +165,7 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
         run_name=config.wandb_run_name if config.wandb_project else None,
         logging_strategy="steps",
         logging_steps=config.logging_steps,
-        bf16= IS_GPU_AVAILABLE,
+        bf16=IS_GPU_AVAILABLE,
         dataloader_pin_memory=IS_GPU_AVAILABLE,
         use_cpu=not IS_GPU_AVAILABLE
     )
@@ -206,7 +206,7 @@ def main() -> None:
         print(f"GPU: {torch.cuda.get_device_name(0)}", flush=True)
 
     # Load model configuration and launch CPT run
-    config = ModelConfig.from_yaml(args.config)
+    config = ModelConfig.from_yaml(args.model_config)
     run_pretraining(config, corpus_path=args.corpus)
 
 if __name__ == '__main__':
