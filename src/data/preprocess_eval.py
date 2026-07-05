@@ -21,7 +21,7 @@ from pathlib import Path
 from datasets import DatasetDict, load_from_disk
 from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase, logging as hf_logging
 
-from src.evaluation.config import EvaluationConfig, TaskType
+from src.evaluation.config import EvalConfig, EvalTaskType
 from src.pretraining.config import ModelConfig
 
 # Configure logging to show timestamps and log level
@@ -72,7 +72,7 @@ def parse_args() -> Namespace:
 
     return parser.parse_args()
     
-def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_config: EvaluationConfig, max_length: int):
+def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_config: EvalConfig, max_length: int):
     """
     Create a preprocessing function for token classification tasks.
 
@@ -81,7 +81,7 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_c
     Subsequent subwords are assigned -100 and ignored by the loss function.
 
     :param tokenizer: Tokenizer for the model being fine-tuned.
-    :param eval_config: EvaluationConfig for the task.
+    :param eval_config: EvalConfig for the task.
     :param max_length: Maximum sequence length.
     :return: Preprocessing function for use with dataset.map().
     """
@@ -124,15 +124,15 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_c
     
     return tokenize_and_align_labels
 
-def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_config: EvaluationConfig, max_length: int):
+def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_config: EvalConfig, max_length: int):
     """
     Create a tokenization function for sequence classification tasks.
 
     Tokenises input sequences and maps string category labels to integer ids 
-    using the label2id mapping defined in EvaluationConfig.
+    using the label2id mapping defined in EvalConfig.
 
     :param tokenizer: Tokenizer for the model being fine-tuned.
-    :param eval_config: EvaluationConfig for the task.
+    :param eval_config: EvalConfig for the task.
     :param max_length: Maximum sequence length.
     :return: Preprocessing function for use with dataset.map().
     """
@@ -156,19 +156,19 @@ def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eva
     
     return tokenize_and_map_labels
 
-def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase, eval_config: EvaluationConfig, max_length: int, num_proc: int):
+def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase, eval_config: EvalConfig, max_length: int, num_proc: int):
     """
     Tokenize and prepare an evaluation dataset for fine-tuning.
     
     :param dataset: DatasetDict loaded from disk.
     :param tokenizer: Tokenizer for the model being fine-tuned.
-    :param eval_config: EvaluationConfig for the task.
+    :param eval_config: EvalConfig for the task.
     :param max_length: Maximum sequence length.
     :param num_proc: Number of processes used for preprocessing.
     :return: Tokenized DatasetDict with all splits provided.
     """
     # Select the appropriate preprocessor function
-    if eval_config.task_type == TaskType.TOKEN_CLASSIFICATION:
+    if eval_config.task_type == EvalTaskType.TOKEN_CLASSIFICATION:
         preprocessor = token_classification_preprocessor(
             tokenizer, 
             eval_config, 
@@ -204,7 +204,7 @@ def main() -> None:
 
     # Load model and evaluation configs
     model_config = ModelConfig.from_yaml(args.model_config)
-    eval_config = EvaluationConfig.from_yaml(args.eval_config)
+    eval_config = EvalConfig.from_yaml(args.eval_config)
     logger.info(f"Model: {model_config.model_name_or_path}")
     logger.info(f"Task: {eval_config.task_name} ({eval_config.task_type.value})")
 
