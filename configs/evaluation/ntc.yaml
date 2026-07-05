@@ -15,8 +15,11 @@ label_names:
   - "politics"
   - "sports"
 
-# Training Configuration
+# Fine-Tuning Configuration
 learning_rate: 5.0e-5
 epochs: 20
 batch_size: 32
 warmup_steps: 0
+
+# Evaluation Configuration
+metric: "f1_weighted"
