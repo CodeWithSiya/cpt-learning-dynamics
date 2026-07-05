@@ -7,13 +7,19 @@ from typing import Union
 
 import yaml
 
-class TaskType(Enum):
+class EvalTaskType(Enum):
     """Enum which represents a downstream evaluation task type."""
     TOKEN_CLASSIFICATION = "token_classification"
     SEQUENCE_CLASSIFICATION = "sequence_classification"
 
+class EvalMetric(Enum):
+    """Enum which represents a downstream evaluation metric."""
+    SPAN_F1 = "seqeval"
+    ACCURACY = "accuracy" 
+    WEIGHTED_F1 = "f1_weighted"
+
 @dataclass
-class EvaluationConfig:
+class EvalConfig:
     """
     Configuration for a single downstream evaluation task.
 
@@ -28,9 +34,10 @@ class EvaluationConfig:
         epochs: Number of fine-tuning epochs.
         batch_size: Per-device batch size.
         warmup_steps: Number of linear warmup steps.
+        metric: Metric used for task evaluation.
     """
     task_name: str
-    task_type: TaskType
+    task_type: EvalTaskType
     dataset_path: str
     input_field: str
     label_field: str
@@ -39,6 +46,7 @@ class EvaluationConfig:
     epochs: int
     batch_size: int
     warmup_steps: int
+    metric: EvalMetric
 
     def __post_init__(self) -> None:
         """Validate configuration values after construction."""
@@ -69,7 +77,7 @@ class EvaluationConfig:
         return {label: i for i, label in enumerate(self.label_names)}
     
     @classmethod
-    def from_yaml(cls, path: Union[str, Path]) -> "EvaluationConfig":
+    def from_yaml(cls, path: Union[str, Path]) -> "EvalConfig":
         """
         Load an EvalConfig from a YAML file.
 
@@ -78,5 +86,5 @@ class EvaluationConfig:
         """
         with open(path) as f:
             data = yaml.safe_load(f)
-        data["task_type"] = TaskType(data["task_type"])
+        data["task_type"] = EvalTaskType(data["task_type"])
         return cls(**data)
