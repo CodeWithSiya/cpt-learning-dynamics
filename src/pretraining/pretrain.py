@@ -130,7 +130,7 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
     tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
 
     def model_init():
-        """Return a fresh model instance, loading pretrained weights as the CPT starting point."""
+        """Return a new model instance, loading pretrained weights as the CPT starting point."""
         return AutoModelForMaskedLM.from_pretrained(config.model_name_or_path)
 
     logging.set_verbosity_warning()
