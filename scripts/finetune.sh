@@ -40,7 +40,7 @@ uv run accelerate launch \
     --num_processes ${SLURM_GPUS_ON_NODE:-1} \
     --mixed_precision bf16 \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/finetuning/finetune.py \
+    src/evaluation/finetune.py \
     --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
     --eval-config configs/evaluation/ner.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/ner \
@@ -52,7 +52,7 @@ uv run accelerate launch \
     --num_processes ${SLURM_GPUS_ON_NODE:-1} \
     --mixed_precision bf16 \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/finetuning/finetune.py \
+    src/evaluation/finetune.py \
     --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
     --eval-config configs/evaluation/pos.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/pos \
