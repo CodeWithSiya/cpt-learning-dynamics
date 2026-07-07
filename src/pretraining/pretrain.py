@@ -198,9 +198,9 @@ def main() -> None:
     """Parse CLI arguments and launch a CPT run."""
     load_dotenv()
     args = parse_args()
-
-    # Reproducibility configuration and device checks
     set_reproducibility()
+
+    # Log device information
     print(f"GPU available: {IS_GPU_AVAILABLE}", flush=True)
     if IS_GPU_AVAILABLE:
         print(f"GPU: {torch.cuda.get_device_name(0)}", flush=True)

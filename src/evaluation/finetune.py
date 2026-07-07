@@ -84,6 +84,11 @@ def parse_args() -> Namespace:
     )
     return parser.parse_args()
 
+def set_reproducibility() -> None:
+    """Configure reproducibility settings for training."""
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
 def checkpoint_step(path: Path) -> int:
     """Extract the training step number from a checkpoint directory name."""
     return int(path.name.split("-")[1])
@@ -316,6 +321,7 @@ def main() -> None:
     """Parse CLI arguments and run fine-tuning across all checkpoints."""
     load_dotenv()
     args = parse_args()
+    set_reproducibility()
 
     # Log device information
     print(f"GPU available: {IS_GPU_AVAILABLE}", flush=True)
