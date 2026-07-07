@@ -84,7 +84,7 @@ def parse_args() -> Namespace:
         "--output-dir",
         type=str,
         default="datasets/evaluation",
-        help="Root directory to save evaluation datasets."
+        help="Directory to save evaluation datasets to disk."
     )
     parser.add_argument(
         "--cache-dir",

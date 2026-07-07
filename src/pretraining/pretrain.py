@@ -130,7 +130,7 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
     tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
 
     def model_init():
-        """Return a fresh model instance, loading pretrained weights as the CPT starting point."""
+        """Return a new model instance, loading pretrained weights as the CPT starting point."""
         return AutoModelForMaskedLM.from_pretrained(config.model_name_or_path)
 
     logging.set_verbosity_warning()
@@ -198,9 +198,9 @@ def main() -> None:
     """Parse CLI arguments and launch a CPT run."""
     load_dotenv()
     args = parse_args()
-
-    # Reproducibility configuration and device checks
     set_reproducibility()
+
+    # Log device information
     print(f"GPU available: {IS_GPU_AVAILABLE}", flush=True)
     if IS_GPU_AVAILABLE:
         print(f"GPU: {torch.cuda.get_device_name(0)}", flush=True)

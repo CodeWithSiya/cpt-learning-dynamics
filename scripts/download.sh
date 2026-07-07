@@ -12,7 +12,7 @@
 
 # Update to latest commit
 git pull
-git log -l
+git log -1
 
 # Suppress uv hardlink warning
 export UV_LINK_MODE=copy
