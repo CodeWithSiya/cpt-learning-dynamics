@@ -37,7 +37,7 @@ uv sync --frozen
 # Preprocess NER evaluation dataset
 uv run python src/data/preprocess_eval.py \
     --model-config configs/models/xlmr.yaml \
-    --eval-config configs/eval/ner.yaml \
+    --eval-config configs/evaluation/ner.yaml \
     --language xho \
     --output datasets/eval/processed/xlmr/xho/ner \
     --nproc ${SLURM_CPUS_PER_TASK}
@@ -45,7 +45,7 @@ uv run python src/data/preprocess_eval.py \
 # Preprocess POS evaluation dataset
 uv run python src/data/preprocess_eval.py \
     --model-config configs/models/xlmr.yaml \
-    --eval-config configs/eval/pos.yaml \
+    --eval-config configs/evaluation/pos.yaml \
     --language xho \
     --output datasets/eval/processed/xlmr/xho/pos \
     --nproc ${SLURM_CPUS_PER_TASK}
@@ -53,7 +53,7 @@ uv run python src/data/preprocess_eval.py \
 # Preprocess NTC evaluation dataset
 uv run python src/data/preprocess_eval.py \
     --model-config configs/models/xlmr.yaml \
-    --eval-config configs/eval/ntc.yaml \
+    --eval-config configs/evaluation/ntc.yaml \
     --language xho \
     --output datasets/eval/processed/xlmr/xho/ntc \
     --nproc ${SLURM_CPUS_PER_TASK}

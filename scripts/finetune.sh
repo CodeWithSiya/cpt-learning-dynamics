@@ -42,7 +42,7 @@ uv run accelerate launch \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
     src/finetuning/finetune.py \
     --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
-    --eval-config configs/eval/ner.yaml \
+    --eval-config configs/evaluation/ner.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/ner \
     --output-dir ${SCRATCH}/results/xlmr/finetuning \
     --language xho
@@ -54,7 +54,7 @@ uv run accelerate launch \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
     src/finetuning/finetune.py \
     --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
-    --eval-config configs/eval/pos.yaml \
+    --eval-config configs/evaluation/pos.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/pos \
     --output-dir ${SCRATCH}/results/xlmr/finetuning \
     --language xho
@@ -66,7 +66,7 @@ uv run accelerate launch \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
     src/finetuning/finetune.py \
     --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
-    --eval-config configs/eval/ntc.yaml \
+    --eval-config configs/evaluation/ntc.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/ntc \
     --output-dir ${SCRATCH}/results/xlmr/finetuning \
     --language xho
