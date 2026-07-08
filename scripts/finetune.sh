@@ -41,10 +41,10 @@ uv run accelerate launch \
     --mixed_precision bf16 \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
     src/evaluation/finetune.py \
-    --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
+    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/checkpoints \
     --eval-config configs/evaluation/ner.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/ner \
-    --output-dir ${SCRATCH}/results/xlmr/finetuning \
+    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/finetuning \
     --language xho
 
 # Fine-tune and evaluate on POS
@@ -53,10 +53,10 @@ uv run accelerate launch \
     --mixed_precision bf16 \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
     src/evaluation/finetune.py \
-    --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
+    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/checkpoints \
     --eval-config configs/evaluation/pos.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/pos \
-    --output-dir ${SCRATCH}/results/xlmr/finetuning \
+    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/finetuning \
     --language xho
 
 # Fine-tune and evaluate on NTC
@@ -64,9 +64,9 @@ uv run accelerate launch \
     --num_processes ${SLURM_GPUS_ON_NODE:-1} \
     --mixed_precision bf16 \
     --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/finetuning/finetune.py \
-    --checkpoint-dir ${SCRATCH}/results/xlmr/checkpoints \
+    src/evaluation/finetune.py \
+    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/checkpoints \
     --eval-config configs/evaluation/ntc.yaml \
     --preprocessed-dir datasets/eval/processed/xlmr/xho/ntc \
-    --output-dir ${SCRATCH}/results/xlmr/finetuning \
+    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/finetuning \
     --language xho
