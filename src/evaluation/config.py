@@ -87,4 +87,5 @@ class EvalConfig:
         with open(path) as f:
             data = yaml.safe_load(f)
         data["task_type"] = EvalTaskType(data["task_type"])
+        data["metric"] = EvalMetric(data["metric"])
         return cls(**data)
