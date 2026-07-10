@@ -17,42 +17,55 @@ class ModelConfig:
         model_name_or_path: HuggingFace hub name or local path to the base model.
         max_seq_length: Maximum sequence length for tokenisation.
         learning_rate: Peak learning rate for training.
-        batch_size: Per-step batch size.
+        per_device_batch_size: Per-device (per-GPU) micro-batch size.
         total_steps: Total number of training steps.
         warmup_steps: Number of linear warmup steps.
         output_dir: Directory to write checkpoints and logs to.
         checkpoint_schedule: Checkpoint schedule configuration.
+        gradient_accumulation_steps: Number of steps to accumulate gradients over.
+        save_steps: Frequency (in steps) at which resumption checkpoints are saved.
+        save_total_limit: Maximum number of resumption checkpoints kept on disk.
+        logging_steps: Frequency at which training metrics are logged in steps.
         wandb_project: W&B project name.
         wandb_run_name: W&B run name.
     """
     model_name_or_path: str
     max_seq_length: int
     learning_rate: float
-    batch_size: int
+    per_device_batch_size: int
     total_steps: int
     warmup_steps: int
     output_dir: str
     checkpoint_schedule: CheckpointScheduleConfig
+    gradient_accumulation_steps: int = 1
+    save_steps: int = 5000
+    save_total_limit: int = 2
+    logging_steps: int = 10
     wandb_project: Optional[str] = None
     wandb_run_name: Optional[str] = None
-    logging_steps: int = 10
 
     def __post_init__(self) -> None:
         """Validate configuration values after construction."""
         if self.learning_rate <= 0:
             raise ValueError(f"learning_rate must be positive, got {self.learning_rate}")
-        if self.batch_size <= 0:
-            raise ValueError(f"batch_size must be positive, got {self.batch_size}")
+        if self.per_device_batch_size <= 0:
+            raise ValueError(f"per_device_batch_size must be positive, got {self.per_device_batch_size}")
+        if self.gradient_accumulation_steps <= 0:
+            raise ValueError(f"gradient_accumulation_steps must be positive, got {self.gradient_accumulation_steps}")
         if self.total_steps <= 0:
             raise ValueError(f"total_steps must be positive, got {self.total_steps}")
         if self.warmup_steps < 0:
             raise ValueError(f"warmup_steps must be non-negative, got {self.warmup_steps}")
         if self.warmup_steps >= self.total_steps:
-            raise ValueError(
-                f"warmup_steps ({self.warmup_steps}) must be less than total_steps ({self.total_steps})"
-            )
+            raise ValueError(f"warmup_steps ({self.warmup_steps}) must be less than total_steps ({self.total_steps})")
         if self.max_seq_length <= 0:
             raise ValueError(f"max_seq_length must be positive, got {self.max_seq_length}")
+        if self.save_steps <= 0:
+            raise ValueError(f"save_steps must be positive, got {self.save_steps}")
+        if self.save_total_limit <= 0:
+            raise ValueError(f"save_total_limit must be positive, got {self.save_total_limit}")
+        if self.logging_steps <= 0:
+            raise ValueError(f"logging_steps must be positive, got {self.logging_steps}")
 
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "ModelConfig":

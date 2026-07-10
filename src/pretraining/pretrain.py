@@ -29,6 +29,7 @@ from transformers import (
     TrainerState,
     logging,
 )
+from transformers.trainer_utils import get_last_checkpoint
 
 from src.pretraining.config import ModelConfig
 from src.pretraining.schedule import compute_checkpoint_steps
@@ -116,7 +117,7 @@ def parse_args() -> Namespace:
     )
     return parser.parse_args()           
 
-def run_pretraining(config: ModelConfig, corpus_path: str):
+def run_pretraining(config: ModelConfig, corpus_path: str) -> None:
     """
     Run continued MLM pretraining for a single model config.
 
@@ -157,9 +158,12 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
         output_dir=str(checkpoint_dir),
         max_steps=total_steps,
         learning_rate=config.learning_rate,
-        per_device_train_batch_size=config.batch_size,
+        per_device_train_batch_size=config.per_device_batch_size,
+        gradient_accumulation_steps=config.gradient_accumulation_steps,
         warmup_steps=config.warmup_steps,
-        save_strategy="no",
+        save_strategy="steps",  # Enables resumption checkpoints
+        save_steps=config.save_steps,
+        save_total_limit=config.save_total_limit,
         seed=RANDOM_SEED,
         report_to="wandb" if config.wandb_project else "none",
         run_name=config.wandb_run_name if config.wandb_project else None,
@@ -184,8 +188,15 @@ def run_pretraining(config: ModelConfig, corpus_path: str):
         ]
     )
 
+    # Resume from the latest resumption checkpoint if one exists
+    last_checkpoint = get_last_checkpoint(str(checkpoint_dir)) if checkpoint_dir.exists() else None
+    if last_checkpoint:
+        print(f"Resuming training from {last_checkpoint}", flush=True)
+    else:
+        print(f"No existing checkpoint found. Starting training from scratch.", flush=True)
+
     print(f"Running CPT for {total_steps} steps on {config.model_name_or_path}...")
-    trainer.train()
+    trainer.train(resume_from_checkpoint=last_checkpoint)
 
     # Save final model and log history
     trainer.save_model(str(checkpoint_dir / f"step-{total_steps}"))
