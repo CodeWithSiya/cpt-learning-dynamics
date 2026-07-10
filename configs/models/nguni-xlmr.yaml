@@ -4,16 +4,23 @@ max_seq_length: 512
 
 # Training Configuration
 learning_rate: 5.0e-5
-batch_size: 80
+per_device_batch_size: 10
+gradient_accumulation_steps: 8
 total_steps: 600000
 warmup_steps: 0
 
+# Resumption Configuration
+save_steps: 5000
+save_total_limit: 2
+
 # Checkpointing Configuration
-output_dir: "/home/mdnsiy014/scratch/cpt-learning-dynamics/results/nguni-xlmr"
+output_dir: "/home/mdnsiy014/scratch/cpt-learning-dynamics/results/nguni-xlmr-large"
 checkpoint_schedule:
   save_initial_checkpoint: true
 
+# Logging
+logging_steps: 100
+
 # Experiment Tracking
 wandb_project: "cpt-learning-dynamics"
-wandb_run_name: "nguni-xlmr-xho"
-logging_steps: 10
+wandb_run_name: "nguni-xlmr-large-cpt"
