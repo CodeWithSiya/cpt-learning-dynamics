@@ -33,11 +33,28 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# Run continued pretraining (CPT)
-uv run accelerate launch \
-    --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-    --mixed_precision bf16 \
-    --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/pretraining/pretrain.py \
-    --model-config configs/models/xlmr.yaml \
-    --corpus datasets/processed/xlmr/xho/train
+# All models available for CPT
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+
+# Language subset to train on
+LANGUAGE="xho"
+
+# First script argument selects a single model; if omitted, loop through all models
+MODEL_ARG="$1"
+if [ -n "${MODEL_ARG}" ]; then
+    MODELS=("${MODEL_ARG}")
+else
+    MODELS=("${ALL_MODELS[@]}")
+fi
+
+for model in "${MODELS[@]}"; do
+    echo "=== Running CPT for model: ${model} ==="
+
+    uv run accelerate launch \
+        --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+        --mixed_precision bf16 \
+        --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
+        src/pretraining/pretrain.py \
+        --model-config configs/models/${model}.yaml \
+        --corpus datasets/processed/${model}/${LANGUAGE}/train
+done
