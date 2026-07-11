@@ -34,19 +34,36 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# Preprocess train split 
-uv run python src/data/preprocess_corpus.py \
-    --input datasets/corpus/xho \
-    --model-config configs/models/xlmr.yaml \
-    --language xho \
-    --output datasets/processed/xlmr/xho/train \
-    --split train \
-    --nproc ${SLURM_CPUS_PER_TASK}
+# All models available for preprocessing
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 
-# Preprocess validation split 
-uv run python src/data/preprocess_corpus.py \
-    --input datasets/corpus/xho \
-    --model-config configs/models/xlmr.yaml \
-    --output datasets/processed/xlmr/xho/validation \
-    --split validation \
-    --nproc ${SLURM_CPUS_PER_TASK}
+# Language subset to preprocess
+LANGUAGE="xho"
+
+# First script argument selects a single model; if omitted, loop through all models
+MODEL_ARG="$1"
+if [ -n "${MODEL_ARG}" ]; then
+    MODELS=("${MODEL_ARG}")
+else
+    MODELS=("${ALL_MODELS[@]}")
+fi
+
+for model in "${MODELS[@]}"; do
+    echo "=== Preprocessing corpus for model: ${model} ==="
+
+    # Preprocess train split
+    uv run python src/data/preprocess_corpus.py \
+        --input datasets/corpus/${LANGUAGE} \
+        --model-config configs/models/${model}.yaml \
+        --output datasets/processed/${model}/${LANGUAGE}/train \
+        --split train \
+        --nproc ${SLURM_CPUS_PER_TASK}
+
+    # Preprocess validation split
+    uv run python src/data/preprocess_corpus.py \
+        --input datasets/corpus/${LANGUAGE} \
+        --model-config configs/models/${model}.yaml \
+        --output datasets/processed/${model}/${LANGUAGE}/validation \
+        --split validation \
+        --nproc ${SLURM_CPUS_PER_TASK}
+done

@@ -52,6 +52,8 @@ for model in "${MODELS[@]}"; do
 
     uv run accelerate launch \
         --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+        --num_machines 1 \
+        --dynamo_backend no \
         --mixed_precision bf16 \
         --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
         src/pretraining/pretrain.py \
