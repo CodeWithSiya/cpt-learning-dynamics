@@ -35,38 +35,37 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# Fine-tune and evaluate on NER
-uv run accelerate launch \
-    --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-    --mixed_precision bf16 \
-    --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/evaluation/finetune.py \
-    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/checkpoints \
-    --eval-config configs/evaluation/ner.yaml \
-    --preprocessed-dir datasets/eval/processed/xlmr/xho/ner \
-    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/finetuning \
-    --language xho
+# All models available for fine-tuning
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 
-# Fine-tune and evaluate on POS
-uv run accelerate launch \
-    --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-    --mixed_precision bf16 \
-    --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/evaluation/finetune.py \
-    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/checkpoints \
-    --eval-config configs/evaluation/pos.yaml \
-    --preprocessed-dir datasets/eval/processed/xlmr/xho/pos \
-    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/finetuning \
-    --language xho
+# All evaluation tasks
+ALL_TASKS=("ner" "pos" "ntc")
 
-# Fine-tune and evaluate on NTC
-uv run accelerate launch \
-    --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-    --mixed_precision bf16 \
-    --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-    src/evaluation/finetune.py \
-    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/checkpoints \
-    --eval-config configs/evaluation/ntc.yaml \
-    --preprocessed-dir datasets/eval/processed/xlmr/xho/ntc \
-    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/xlmr/finetuning \
-    --language xho
+# Language subset being evaluated
+LANGUAGE="xho"
+
+# First script argument selects a single model; if omitted, loop through all models
+MODEL_ARG="$1"
+if [ -n "${MODEL_ARG}" ]; then
+    MODELS=("${MODEL_ARG}")
+else
+    MODELS=("${ALL_MODELS[@]}")
+fi
+
+for model in "${MODELS[@]}"; do
+    for task in "${ALL_TASKS[@]}"; do
+        echo "=== Fine-tuning and evaluating ${model} on ${task} ==="
+
+        uv run accelerate launch \
+            --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+            --num_machines 1 \
+            --dynamo_backend no \
+            --mixed_precision bf16 \
+            --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
+            src/evaluation/finetune.py \
+            --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}/checkpoints \
+            --eval-config configs/evaluation/${task}.yaml \
+            --preprocessed-dir datasets/processed/evaluation/${model}/${LANGUAGE}/${task} \
+            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}/finetuning
+    done
+done

@@ -36,9 +36,9 @@ uv sync --frozen
 # Download WURA isiXhosa corpus
 uv run python src/data/download_corpus.py \
     --language xho \
-    --output-dir datasets/corpus
+    --output-dir datasets/raw/corpus
 
 # Download all evaluation datasets
 uv run python src/data/download_eval_data.py \
     --language xho \
-    --output-dir datasets/evaluation
+    --output-dir datasets/raw/evaluation
