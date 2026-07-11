@@ -10,6 +10,8 @@ The script performs the following tasks:
 import os
 import argparse
 import json
+import warnings
+
 from dotenv import load_dotenv
 from argparse import Namespace
 from typing import cast
@@ -94,9 +96,10 @@ class CheckpointScheduleCallback(TrainerCallback):
             print(f"Saved checkpoint: step-{state.global_step}", flush=True)
             
 def set_reproducibility() -> None:
-    """Configure reproducibility settings for training."""
+    """Configure determinism settings for training."""
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     torch.use_deterministic_algorithms(True, warn_only=True)
+    warnings.filterwarnings("ignore", message="Flash Attention defaults to a non-deterministic algorithm")
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
