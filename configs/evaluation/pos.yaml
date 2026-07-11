@@ -1,7 +1,7 @@
 # Task Configuration
 task_name: "pos"
 task_type: "token_classification"
-dataset_path: "datasets/evaluation/pos"
+dataset_path: "datasets/raw/evaluation/pos"
 
 # Dataset Fields
 input_field: "tokens"

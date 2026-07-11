@@ -5,7 +5,7 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
+#SBATCH --time=47:59:00
 #SBATCH --job-name="cpt-finetune"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL

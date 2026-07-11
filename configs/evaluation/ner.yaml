@@ -1,7 +1,7 @@
 # Task Configuration
 task_name: "ner"
 task_type: "token_classification"
-dataset_path: "datasets/evaluation/ner"
+dataset_path: "datasets/raw/evaluation/ner"
 
 # Dataset Fields
 input_field: "tokens"
