@@ -76,12 +76,6 @@ def parse_args() -> Namespace:
         required=True,
         help="Directory to save fine-tuning results to disk."
     )
-    parser.add_argument(
-        "--language",
-        type=str,
-        default="xho",
-        help="Language subset being evaluated. Default: xho (isiXhosa)."
-    )
     return parser.parse_args()
 
 def set_reproducibility() -> None:
@@ -217,14 +211,13 @@ def create_compute_metrics(eval_config: EvalConfig):
     
     return compute_metrics
 
-def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, dataset: DatasetDict, language: str, output_dir: Path) -> dict[str, object]:
+def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, dataset: DatasetDict, output_dir: Path) -> dict[str, object]:
     """
     Fine-tune a CPT checkpoint on a single downstream task and evaluate it on the test split.
     
     :param checkpoint_path: Path to the CPT checkpoint.
     :param eval_config: EvalConfig for the task.
     :param dataset: Preprocessed DatasetDict loaded from disk.
-    :param language: Language subset being evaluated.
     :param output_dir: Directory to save fine-tuning results to.
     :return: Dict containing test metrics and full training log history.
     """
@@ -263,7 +256,7 @@ def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, datase
 
     # Configure W&B run name for this fine-tuning run
     wandb_project = os.environ.get("WANDB_PROJECT")
-    run_name = f"{step}-{eval_config.task_name}-{language}" if wandb_project else None
+    run_name = f"{step}-{eval_config.task_name}" if wandb_project else None
 
     # Training arguments
     training_args = TrainingArguments(
@@ -304,7 +297,6 @@ def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, datase
     results = {
         "checkpoint": step,
         "task": eval_config.task_name,
-        "language": language,
         "test_metrics": test_metrics,
         "log_history": trainer.state.log_history
     }
@@ -351,7 +343,6 @@ def main() -> None:
             checkpoint_path=checkpoint_path,
             eval_config=eval_config,
             dataset=dataset,
-            language=args.language,
             output_dir=output_dir
         )
 

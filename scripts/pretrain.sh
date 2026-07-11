@@ -3,7 +3,7 @@
 #SBATCH --account=l40sfree
 #SBATCH --partition=l40s
 #SBATCH --nodes=1 --ntasks=1 --gres=gpu:l40s:1
-#SBATCH --time=00:30:00
+#SBATCH --time=47:59:00
 #SBATCH --job-name="cpt-pretrain"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -58,5 +58,5 @@ for model in "${MODELS[@]}"; do
         --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
         src/pretraining/pretrain.py \
         --model-config configs/models/${model}.yaml \
-        --corpus datasets/processed/${model}/${LANGUAGE}/train
+        --corpus datasets/processed/corpus/${model}/${LANGUAGE}/train
 done

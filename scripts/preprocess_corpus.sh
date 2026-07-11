@@ -4,7 +4,7 @@
 #SBATCH --partition=ada
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=01:00:00
+#SBATCH --time=47:59:00
 #SBATCH --job-name="cpt-preprocess-corpus"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -53,17 +53,17 @@ for model in "${MODELS[@]}"; do
 
     # Preprocess train split
     uv run python src/data/preprocess_corpus.py \
-        --input datasets/corpus/${LANGUAGE} \
+        --input datasets/raw/corpus/${LANGUAGE} \
         --model-config configs/models/${model}.yaml \
-        --output datasets/processed/${model}/${LANGUAGE}/train \
+        --output datasets/processed/corpus/${model}/${LANGUAGE}/train \
         --split train \
         --nproc ${SLURM_CPUS_PER_TASK}
 
     # Preprocess validation split
     uv run python src/data/preprocess_corpus.py \
-        --input datasets/corpus/${LANGUAGE} \
+        --input datasets/raw/corpus/${LANGUAGE} \
         --model-config configs/models/${model}.yaml \
-        --output datasets/processed/${model}/${LANGUAGE}/validation \
+        --output datasets/processed/corpus/${model}/${LANGUAGE}/validation \
         --split validation \
         --nproc ${SLURM_CPUS_PER_TASK}
 done
