@@ -24,6 +24,7 @@ from transformers import (
     AutoModelForMaskedLM,
     AutoTokenizer,
     DataCollatorForLanguageModeling,
+    EarlyStoppingCallback,
     Trainer,
     TrainingArguments,
     TrainerControl,
@@ -113,19 +114,26 @@ def parse_args() -> Namespace:
         help="Path to model YAML config."
     )
     parser.add_argument(
-        "--corpus",
+        "--train-corpus",
         type=str,
         required=True,
-        help="Path to the pre-tokenized corpus on disk (output of src/data/preprocess_corpus.py)."
+        help="Path to the pre-tokenized training corpus on disk (output of src/data/preprocess_corpus.py)."
+    )
+    parser.add_argument(
+        "--validation-corpus",
+        type=str,
+        required=True,
+        help="Path to the pre-tokenized validation corpus on disk (output of src/data/preprocess_corpus.py)."
     )
     return parser.parse_args()           
 
-def run_pretraining(config: ModelConfig, corpus_path: str) -> None:
+def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corpus_path: str) -> None:
     """
     Run continued MLM pretraining for a single model config.
 
     :param config: ModelConfig loaded from YAML.
-    :param corpus_path: Path to the pre-tokenized, chunked corpus on disk.
+    :param train_corpus_path: Path to the pre-tokenized, chunked training corpus on disk.
+    :param validation_corpus_path: Path to the pre-tokenized, chunked validation corpus on disk.
     """
     total_steps = config.total_steps
 
@@ -139,9 +147,12 @@ def run_pretraining(config: ModelConfig, corpus_path: str) -> None:
 
     logging.set_verbosity_warning()
 
-    # Load the preprocessed corpus from disk
-    chunked_corpus = load_from_disk(corpus_path)
-    print(f"Loaded {len(chunked_corpus):,} pre-tokenized chunks from {corpus_path}", flush=True)
+    # Load the preprocessed training and evaluation corpora from disk
+    chunked_train_corpus = load_from_disk(train_corpus_path)
+    print(f"Loaded {len(chunked_train_corpus):,} pre-tokenized chunks from {train_corpus_path}", flush=True)
+
+    chunked_validation_corpus = load_from_disk(validation_corpus_path)
+    print(f"Loaded {len(chunked_validation_corpus):,} pre-tokenized chunks from {validation_corpus_path}", flush=True)
 
     # Compute the CPT checkpoint steps
     checkpoint_steps = compute_checkpoint_steps(total_steps, config=config.checkpoint_schedule)
@@ -162,6 +173,7 @@ def run_pretraining(config: ModelConfig, corpus_path: str) -> None:
         max_steps=total_steps,
         learning_rate=config.learning_rate,
         per_device_train_batch_size=config.per_device_batch_size,
+        per_device_eval_batch_size=config.per_device_batch_size,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
         warmup_steps=config.warmup_steps,
         save_strategy="steps",  # Enables resumption checkpoints
@@ -173,21 +185,29 @@ def run_pretraining(config: ModelConfig, corpus_path: str) -> None:
         logging_strategy="steps",
         logging_steps=config.logging_steps,
         bf16=IS_GPU_AVAILABLE,
+        dataloader_num_workers=4,
         dataloader_pin_memory=IS_GPU_AVAILABLE,
-        use_cpu=not IS_GPU_AVAILABLE
+        use_cpu=not IS_GPU_AVAILABLE,
+        eval_strategy="steps",
+        eval_steps=config.eval_steps,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        load_best_model_at_end=True
     )
 
     # Model Training
     trainer = Trainer(
         model_init=model_init,
         args=training_args,
-        train_dataset=cast(Dataset, chunked_corpus),
+        train_dataset=cast(Dataset, chunked_train_corpus),
+        eval_dataset=cast(Dataset, chunked_validation_corpus),
         data_collator=DataCollatorForLanguageModeling(
             tokenizer=tokenizer, mlm=True, mlm_probability=MLM_PROBABILITY
         ),
         callbacks=[
             ProgressCallback(),
-            CheckpointScheduleCallback(checkpoint_steps, save_dir=checkpoint_dir)
+            CheckpointScheduleCallback(checkpoint_steps, save_dir=checkpoint_dir),
+            EarlyStoppingCallback(early_stopping_patience=5)
         ]
     )
 
@@ -202,7 +222,8 @@ def run_pretraining(config: ModelConfig, corpus_path: str) -> None:
     trainer.train(resume_from_checkpoint=last_checkpoint)
 
     # Save final model and log history
-    trainer.save_model(str(checkpoint_dir / f"step-{total_steps}"))
+    final_step = trainer.state.global_step
+    trainer.save_model(str(checkpoint_dir / f"step-{final_step}"))
     with open(output_dir / "log_history.json", "w") as f:
         json.dump(trainer.state.log_history, f, indent=2)
 
@@ -221,7 +242,7 @@ def main() -> None:
 
     # Load model configuration and launch CPT run
     config = ModelConfig.from_yaml(args.model_config)
-    run_pretraining(config, corpus_path=args.corpus)
+    run_pretraining(config, train_corpus_path=args.train_corpus, validation_corpus_path=args.validation_corpus)
 
 if __name__ == '__main__':
     main()

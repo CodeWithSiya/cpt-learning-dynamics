@@ -4,13 +4,14 @@ max_seq_length: 512
 
 # Training Configuration
 learning_rate: 5.0e-5
-per_device_batch_size: 10
-gradient_accumulation_steps: 8
-total_steps: 600000
+per_device_batch_size: 32
+gradient_accumulation_steps: 4
+total_steps: 1000
 warmup_steps: 0
+eval_steps: 100
 
 # Resumption Configuration
-save_steps: 5000
+save_steps: 100
 save_total_limit: 2
 
 # Checkpointing Configuration

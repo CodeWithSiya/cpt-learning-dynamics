@@ -58,5 +58,6 @@ for model in "${MODELS[@]}"; do
         --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
         src/pretraining/pretrain.py \
         --model-config configs/models/${model}.yaml \
-        --corpus datasets/processed/corpus/${model}/${LANGUAGE}/train
+        --train-corpus datasets/processed/corpus/${model}/${LANGUAGE}/train \
+        --validation-corpus datasets/processed/corpus/${model}/${LANGUAGE}/validation
 done
