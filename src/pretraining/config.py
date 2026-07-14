@@ -20,10 +20,11 @@ class ModelConfig:
         per_device_batch_size: Per-device (per-GPU) micro-batch size.
         total_steps: Total number of training steps.
         warmup_steps: Number of linear warmup steps.
+        eval_steps: Frequency at which validation loss is computed.
         output_dir: Directory to write checkpoints and logs to.
         checkpoint_schedule: Checkpoint schedule configuration.
         gradient_accumulation_steps: Number of steps to accumulate gradients over.
-        save_steps: Frequency (in steps) at which resumption checkpoints are saved.
+        save_steps: Frequency at which resumption checkpoints are saved.
         save_total_limit: Maximum number of resumption checkpoints kept on disk.
         logging_steps: Frequency at which training metrics are logged in steps.
         wandb_project: W&B project name.
@@ -35,6 +36,7 @@ class ModelConfig:
     per_device_batch_size: int
     total_steps: int
     warmup_steps: int
+    eval_steps: int
     output_dir: str
     checkpoint_schedule: CheckpointScheduleConfig
     gradient_accumulation_steps: int = 1
@@ -60,12 +62,19 @@ class ModelConfig:
             raise ValueError(f"warmup_steps ({self.warmup_steps}) must be less than total_steps ({self.total_steps})")
         if self.max_seq_length <= 0:
             raise ValueError(f"max_seq_length must be positive, got {self.max_seq_length}")
+        if self.eval_steps <= 0:
+            raise ValueError(f"eval_steps must be positive, got {self.eval_steps}")
         if self.save_steps <= 0:
             raise ValueError(f"save_steps must be positive, got {self.save_steps}")
         if self.save_total_limit <= 0:
             raise ValueError(f"save_total_limit must be positive, got {self.save_total_limit}")
         if self.logging_steps <= 0:
             raise ValueError(f"logging_steps must be positive, got {self.logging_steps}")
+        if self.save_steps % self.eval_steps != 0:
+            raise ValueError(
+                f"save_steps ({self.save_steps}) must be a multiple of eval_steps ({self.eval_steps}) "
+                f"when load_best_model_at_end is used."
+            )
 
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "ModelConfig":
