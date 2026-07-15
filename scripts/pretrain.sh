@@ -3,6 +3,7 @@
 #SBATCH --account=l40sfree
 #SBATCH --partition=l40s
 #SBATCH --nodes=1 --ntasks=1 --gres=gpu:l40s:1
+#SBATCH --cpus-per-task=4
 #SBATCH --time=47:59:00
 #SBATCH --job-name="cpt-pretrain"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
