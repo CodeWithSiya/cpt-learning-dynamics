@@ -63,9 +63,9 @@ for model in "${MODELS[@]}"; do
             --mixed_precision bf16 \
             --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
             src/evaluation/finetune.py \
-            --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}/checkpoints \
+            --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
             --eval-config configs/evaluation/${task}.yaml \
             --preprocessed-dir datasets/processed/evaluation/${model}/${LANGUAGE}/${task} \
-            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}/finetuning
+            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning
     done
 done
