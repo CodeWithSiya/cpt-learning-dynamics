@@ -164,8 +164,10 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     # Configure Weights and Biases for CPT tracking 
-    if config.wandb_project:
+    if config.wandb_project and config.wandb_run_name:
         os.environ["WANDB_PROJECT"] = config.wandb_project
+        os.environ["WANDB_RUN_ID"] = config.wandb_run_name
+        os.environ["WANDB_RESUME"] = "allow"
 
     # Training Arguments (Checkpointing handled by CheckpointScheduleCallBack)
     training_args = TrainingArguments(
