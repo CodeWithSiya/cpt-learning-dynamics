@@ -33,6 +33,8 @@ from transformers import (
     logging as hf_logging
 )
 
+from sklearn.metrics import classification_report
+
 from src.evaluation.config import EvalConfig, EvalMetric, EvalTaskType
 
 # Configure logging to show timestamps and log level
@@ -145,16 +147,25 @@ def create_compute_metrics(eval_config: EvalConfig):
                 true_labels.append(true_label_seq)
                 true_predictions.append(true_prediction_seq)
 
-            # Compute and return evaluation results
+            # Compute evaluation results
             results = seqeval.compute(
                 predictions=true_predictions,
                 references=true_labels,
-            )
+            ) or {}
+
+            # Extract per-entity-type F1 for learning dynamics plotting
+            per_class_f1 = {
+                entity_type: metrics["f1"]
+                for entity_type, metrics in results.items()
+                if isinstance(metrics, dict) and "f1" in metrics
+            }
+
             return {
-                "precision": results["overall_precision"] if results is not None else 0.0,
-                "recall": results["overall_recall"] if results is not None else 0.0,
-                "f1": results["overall_f1"] if results is not None else 0.0,
-                "accuracy": results["overall_accuracy"] if results is not None else 0.0,
+                "precision": results.get("overall_precision", 0.0),
+                "recall": results.get("overall_recall", 0.0),
+                "f1": results.get("overall_f1", 0.0),
+                "accuracy": results.get("overall_accuracy", 0.0),
+                "per_class_f1": per_class_f1
             }
         
     elif eval_config.metric == EvalMetric.ACCURACY:
@@ -176,13 +187,30 @@ def create_compute_metrics(eval_config: EvalConfig):
                         true_labels.append(label_id)
                         true_predictions.append(prediction_id)
 
-            # Compute and return accuracy result
+            # Compute accuracy result
             result = accuracy_metric.compute(
                 predictions=true_predictions,
                 references=true_labels
-            )
+            ) or {}
+
+            # Per-tag F1 breakdown for learning dynamics plotting
+            report = cast(dict, classification_report(
+                true_labels,
+                true_predictions,
+                labels=list(range(len(eval_config.label_names))),
+                target_names=eval_config.label_names,
+                output_dict=True,
+                zero_division=0
+            ))
+            per_class_f1 = {
+                tag: report[tag]["f1-score"]
+                for tag in eval_config.label_names
+                if tag in report
+            }
+
             return {
-                "accuracy": result["accuracy"] if result is not None else 0.0  
+                "accuracy": result.get("accuracy", 0.0),
+                "per_class_f1": per_class_f1
             }
         
     elif eval_config.metric == EvalMetric.WEIGHTED_F1:
@@ -198,9 +226,26 @@ def create_compute_metrics(eval_config: EvalConfig):
                 predictions=predictions,
                 references=labels,
                 average="weighted",
-            )
+            ) or {}
+
+            # Per-category F1 breakdown for learning dynamics plotting
+            report = cast(dict, classification_report(
+                labels,
+                predictions,
+                labels=list(range(len(eval_config.label_names))),
+                target_names=eval_config.label_names,
+                output_dict=True,
+                zero_division=0
+            ))
+            per_class_f1 = {
+                category: report[category]["f1-score"]
+                for category in eval_config.label_names
+                if category in report
+            }
+
             return {
-                "f1": result["f1"] if result is not None else 0.0
+                "f1": result.get("f1", 0.0),
+                "per_class_f1": per_class_f1
             }
 
     else:
