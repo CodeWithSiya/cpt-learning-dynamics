@@ -12,6 +12,7 @@ import os
 import json
 import logging
 import argparse
+import warnings
 from dotenv import load_dotenv
 from argparse import Namespace
 from pathlib import Path
@@ -84,6 +85,7 @@ def set_reproducibility() -> None:
     """Configure reproducibility settings for training."""
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     torch.use_deterministic_algorithms(True, warn_only=True)
+    warnings.filterwarnings("ignore", message="Flash Attention defaults to a non-deterministic algorithm")
 
 def checkpoint_step(path: Path) -> int:
     """Extract the training step number from a checkpoint directory name."""
@@ -319,6 +321,7 @@ def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, datase
         run_name=run_name,
         bf16=IS_GPU_AVAILABLE,
         use_cpu=not IS_GPU_AVAILABLE,
+        dataloader_num_workers=4,
         dataloader_pin_memory=IS_GPU_AVAILABLE,
         load_best_model_at_end=False,
     )
