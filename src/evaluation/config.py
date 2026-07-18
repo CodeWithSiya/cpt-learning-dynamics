@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 
 import yaml
 
@@ -47,6 +47,7 @@ class EvalConfig:
     batch_size: int
     warmup_steps: int
     metric: EvalMetric
+    wandb_project: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Validate configuration values after construction."""
