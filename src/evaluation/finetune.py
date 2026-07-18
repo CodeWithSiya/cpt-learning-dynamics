@@ -302,6 +302,9 @@ def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, datase
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # Configure W&B run name for this fine-tuning run
+    if eval_config.wandb_project:
+        os.environ["WANDB_PROJECT"] = eval_config.wandb_project
+        
     wandb_project = os.environ.get("WANDB_PROJECT")
     run_name = f"{step}-{eval_config.task_name}" if wandb_project else None
 
