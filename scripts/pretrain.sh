@@ -48,6 +48,13 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
+# W&B run IDs per model, so resubmitted jobs resume the same run
+declare -A WANDB_RUN_IDS=(
+    ["roberta"]="roberta-large-cpt-final"
+    ["xlmr"]="xlmr-large-cpt-final"
+    ["nguni-xlmr"]="nguni-xlmr-large-cpt-final"
+)
+
 for model in "${MODELS[@]}"; do
     echo "=== Running CPT for model: ${model} ==="
 
@@ -60,5 +67,6 @@ for model in "${MODELS[@]}"; do
         src/pretraining/pretrain.py \
         --model-config configs/models/${model}.yaml \
         --train-corpus datasets/processed/corpus/${model}/${LANGUAGE}/train \
-        --validation-corpus datasets/processed/corpus/${model}/${LANGUAGE}/validation
+        --validation-corpus datasets/processed/corpus/${model}/${LANGUAGE}/validation \
+        --wandb-run-id "${WANDB_RUN_IDS[$model]}"
 done

@@ -14,7 +14,7 @@ import warnings
 
 from dotenv import load_dotenv
 from argparse import Namespace
-from typing import cast
+from typing import cast, Optional
 from pathlib import Path
 
 import torch
@@ -25,6 +25,7 @@ from transformers import (
     AutoTokenizer,
     DataCollatorForLanguageModeling,
     EarlyStoppingCallback,
+    PreTrainedTokenizerBase,
     Trainer,
     TrainingArguments,
     TrainerControl,
@@ -60,15 +61,17 @@ class ProgressCallback(TrainerCallback):
 class CheckpointScheduleCallback(TrainerCallback):
     """Save a checkpoint directly on a steps dictated by the two-phase schedule."""
 
-    def __init__(self, checkpoint_steps: list[int], save_dir: Path) -> None:
+    def __init__(self, checkpoint_steps: list[int], save_dir: Path, tokenizer: PreTrainedTokenizerBase) -> None:
         """
         Store the precomputed checkpoint and target directory.
 
         :param checkpoint_steps: Steps at which to save, from compute_schedule_step().
         :param save_dir: Directory under which step subfolders are created.
+        :param tokenizer: Tokenizer to save alongside each model checkpoint.
         """
         self.checkpoint_steps = set(checkpoint_steps)
         self.save_dir = save_dir
+        self.tokenizer = tokenizer
         
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
         """
@@ -82,6 +85,7 @@ class CheckpointScheduleCallback(TrainerCallback):
             model = kwargs.get("model")
             if model is not None:
                 model.save_pretrained(self.save_dir / "step-0")
+                self.tokenizer.save_pretrained(self.save_dir / "step-0")
                 print("Saved checkpoint: step-0", flush=True)
 
     def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
@@ -94,6 +98,7 @@ class CheckpointScheduleCallback(TrainerCallback):
         """
         if state.global_step in self.checkpoint_steps and state.is_world_process_zero: 
             kwargs["model"].save_pretrained(self.save_dir / f"step-{state.global_step}")
+            self.tokenizer.save_pretrained(self.save_dir / f"step-{state.global_step}")
             print(f"Saved checkpoint: step-{state.global_step}", flush=True)
             
 def set_reproducibility() -> None:
@@ -125,15 +130,52 @@ def parse_args() -> Namespace:
         required=True,
         help="Path to the pre-tokenized validation corpus on disk (output of src/data/preprocess_corpus.py)."
     )
-    return parser.parse_args()           
+    parser.add_argument(
+        "--wandb-run-id",
+        type=str,
+        default=None,
+        help="Optional W&B run ID for resuming a specific run. If omitted, a new run is created."
+    )
+    return parser.parse_args() 
 
-def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corpus_path: str) -> None:
+def checkpoint_step(path: Path) -> int:
+    """Extract the training step number from a checkpoint directory name."""
+    return int(path.name.split("-")[1])
+
+def get_full_log_history(checkpoint_dir: Path) -> list[dict]:
+    """
+    Retrieve the complete log history from the most recent resumption checkpoint.
+
+    :param checkpoint_dir: Directory containing checkpoint-N subfolders.
+    :return: Full log history across resumptions. 
+    """   
+    checkpoints = []     
+
+    # Search for all checkpoint directories and sort them
+    for path in checkpoint_dir.iterdir():
+        if path.is_dir() and path.name.startswith("checkpoint-"):
+            checkpoints.append(path)
+
+    if not checkpoints:
+        return []
+
+    checkpoints.sort(key=checkpoint_step)  
+
+    # Get the training history fron the latest checkpoint
+    latest_checkpoint = checkpoints[-1]
+    with open(latest_checkpoint / "trainer_state.json") as f:
+        state = json.load(f)
+
+    return state.get("log_history", [])
+
+def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corpus_path: str, wandb_run_id: Optional[str] = None) -> None:
     """
     Run continued MLM pretraining for a single model config.
 
     :param config: ModelConfig loaded from YAML.
     :param train_corpus_path: Path to the pre-tokenized, chunked training corpus on disk.
     :param validation_corpus_path: Path to the pre-tokenized, chunked validation corpus on disk.
+    :param wandb_run_id: Optional W&B run ID for resuming a specific run.
     """
     total_steps = config.total_steps
 
@@ -163,10 +205,12 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     checkpoint_dir = output_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    # Configure Weights and Biases for CPT tracking 
-    if config.wandb_project and config.wandb_run_name:
+    # Configure Weights and Biases for CPT tracking and resumption support
+    if config.wandb_project:
         os.environ["WANDB_PROJECT"] = config.wandb_project
-        os.environ["WANDB_RUN_ID"] = config.wandb_run_name
+
+    if config.wandb_project and wandb_run_id:
+        os.environ["WANDB_RUN_ID"] = wandb_run_id
         os.environ["WANDB_RESUME"] = "allow"
 
     # Training Arguments (Checkpointing handled by CheckpointScheduleCallBack)
@@ -194,8 +238,19 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
         eval_steps=config.eval_steps,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
-        load_best_model_at_end=True
+        load_best_model_at_end=config.use_early_stopping
     )
+
+    # Initialise training callbacks
+    callbacks=[
+            ProgressCallback(),
+            CheckpointScheduleCallback(checkpoint_steps=checkpoint_steps, save_dir=checkpoint_dir, tokenizer=tokenizer),
+    ]
+
+    if config.use_early_stopping:
+        callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=config.early_stopping_patience)
+        )
 
     # Model Training
     trainer = Trainer(
@@ -206,11 +261,8 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
         data_collator=DataCollatorForLanguageModeling(
             tokenizer=tokenizer, mlm=True, mlm_probability=MLM_PROBABILITY
         ),
-        callbacks=[
-            ProgressCallback(),
-            CheckpointScheduleCallback(checkpoint_steps, save_dir=checkpoint_dir),
-            EarlyStoppingCallback(early_stopping_patience=5)
-        ]
+        processing_class=tokenizer,
+        callbacks=callbacks
     )
 
     # Resume from the latest resumption checkpoint if one exists
@@ -223,11 +275,14 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     print(f"Running CPT for {total_steps} steps on {config.model_name_or_path}...")
     trainer.train(resume_from_checkpoint=last_checkpoint)
 
-    # Save final model and log history
+    # Save final model and full log history
     final_step = trainer.state.global_step
     trainer.save_model(str(checkpoint_dir / f"step-{final_step}"))
+    tokenizer.save_pretrained(str(checkpoint_dir / f"step-{final_step}"))
+
+    full_history = get_full_log_history(checkpoint_dir)
     with open(output_dir / "log_history.json", "w") as f:
-        json.dump(trainer.state.log_history, f, indent=2)
+        json.dump(full_history, f, indent=2)
 
     print("CPT complete.", flush=True)
 
@@ -244,7 +299,12 @@ def main() -> None:
 
     # Load model configuration and launch CPT run
     config = ModelConfig.from_yaml(args.model_config)
-    run_pretraining(config, train_corpus_path=args.train_corpus, validation_corpus_path=args.validation_corpus)
+    run_pretraining(
+        config, 
+        train_corpus_path=args.train_corpus, 
+        validation_corpus_path=args.validation_corpus,
+        wandb_run_id=args.wandb_run_id
+    )
 
 if __name__ == '__main__':
     main()

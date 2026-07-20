@@ -18,12 +18,14 @@ class ModelConfig:
         max_seq_length: Maximum sequence length for tokenisation.
         learning_rate: Peak learning rate for training.
         per_device_batch_size: Per-device (per-GPU) micro-batch size.
+        gradient_accumulation_steps: Number of steps to accumulate gradients over.
         total_steps: Total number of training steps.
         warmup_steps: Number of linear warmup steps.
         eval_steps: Frequency at which validation loss is computed.
         output_dir: Directory to write checkpoints and logs to.
         checkpoint_schedule: Checkpoint schedule configuration.
-        gradient_accumulation_steps: Number of steps to accumulate gradients over.
+        use_early_stopping: Whether to apply early stopping based on validation loss.
+        early_stopping_patience: Number of non-improving evals to tolerate before stopping.
         save_steps: Frequency at which resumption checkpoints are saved.
         save_total_limit: Maximum number of resumption checkpoints kept on disk.
         logging_steps: Frequency at which training metrics are logged in steps.
@@ -34,12 +36,14 @@ class ModelConfig:
     max_seq_length: int
     learning_rate: float
     per_device_batch_size: int
+    gradient_accumulation_steps: int
     total_steps: int
     warmup_steps: int
     eval_steps: int
     output_dir: str
     checkpoint_schedule: CheckpointScheduleConfig
-    gradient_accumulation_steps: int = 1
+    use_early_stopping: bool = False
+    early_stopping_patience: int = 5
     save_steps: int = 5000
     save_total_limit: int = 2
     logging_steps: int = 10
@@ -66,6 +70,8 @@ class ModelConfig:
             raise ValueError(f"eval_steps must be positive, got {self.eval_steps}")
         if self.save_steps <= 0:
             raise ValueError(f"save_steps must be positive, got {self.save_steps}")
+        if self.early_stopping_patience <= 0:
+            raise ValueError(f"early_stopping_patience must be positive, got {self.early_stopping_patience}")
         if self.save_total_limit <= 0:
             raise ValueError(f"save_total_limit must be positive, got {self.save_total_limit}")
         if self.logging_steps <= 0:
