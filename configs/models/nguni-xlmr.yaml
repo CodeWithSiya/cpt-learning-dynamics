@@ -9,6 +9,8 @@ gradient_accumulation_steps: 8
 total_steps: 600000
 warmup_steps: 0
 eval_steps: 5000
+early_stopping_patience: 5
+use_early_stopping: false
 
 # Resumption Configuration
 save_steps: 5000
