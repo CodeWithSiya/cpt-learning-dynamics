@@ -221,8 +221,7 @@ __marimo__/
 .env
 
 # Datasets
-datasets/corpus
-datasets/evaluation
+datasets
 
 # HuggingFace cache
 .cache/

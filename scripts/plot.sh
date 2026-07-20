@@ -5,7 +5,7 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --time=00:30:00
-#SBATCH --job-name="cpt-plot"
+#SBATCH --job-name="cpt-plot-dynamics"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --output=logs/plot_%j.log
@@ -49,7 +49,7 @@ for model in "${MODELS[@]}"; do
     for task in "${ALL_TASKS[@]}"; do
         echo "=== Plotting learning dynamics for ${model} on ${task} ==="
 
-        uv run python src/visualisation/plot_dynamics.py \
+        uv run python src/visualisation/plot.py \
             --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
             --task ${task} \
             --output-dir plots/${model}
