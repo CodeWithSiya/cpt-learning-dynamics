@@ -5,11 +5,11 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --time=00:30:00
-#SBATCH --job-name="cpt-plot-dynamics"
+#SBATCH --job-name="cpt-aggregate"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/plot_%j.log
-#SBATCH --error=logs/plot_%j.log
+#SBATCH --output=logs/aggregate_%j.log
+#SBATCH --error=logs/aggregate_%j.log
 
 # Update to latest commit
 git pull
@@ -31,7 +31,7 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# All models available for plotting
+# All models available for aggregation
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 
 # All evaluation tasks
@@ -47,11 +47,11 @@ fi
 
 for model in "${MODELS[@]}"; do
     for task in "${ALL_TASKS[@]}"; do
-        echo "=== Plotting learning dynamics for ${model} on ${task} ==="
+        echo "=== Aggregating ${task} results for ${model} across seeds ==="
 
-        uv run python src/visualisation/plot.py \
+        uv run python src/finetuning/aggregate.py \
             --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
             --task ${task} \
-            --output-dir plots/${model}
+            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated/${task}_aggregated.json
     done
 done

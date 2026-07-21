@@ -21,7 +21,7 @@ from pathlib import Path
 from datasets import DatasetDict, load_from_disk
 from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase, logging as hf_logging
 
-from src.evaluation.config import EvalConfig, EvalTaskType
+from src.finetuning.config import TaskConfig, TaskType
 from src.pretraining.config import ModelConfig
 
 # Configure logging to show timestamps and log level
@@ -46,7 +46,7 @@ def parse_args() -> Namespace:
         help="Path to model YAML config (provides model_name_or_path and max_seq_length)."
     )
     parser.add_argument(
-        "--eval-config",
+        "--task-config",
         type=str,
         required=True,
         help="Path to evaluation task YAML config."
@@ -72,7 +72,7 @@ def parse_args() -> Namespace:
 
     return parser.parse_args()
     
-def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_config: EvalConfig, max_length: int):
+def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int):
     """
     Create a preprocessing function for token classification tasks.
 
@@ -81,7 +81,7 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_c
     Subsequent subwords are assigned -100 and ignored by the loss function.
 
     :param tokenizer: Tokenizer for the model being fine-tuned.
-    :param eval_config: EvalConfig for the task.
+    :param task_config: TaskConfig for the task.
     :param max_length: Maximum sequence length.
     :return: Preprocessing function for use with dataset.map().
     """
@@ -89,7 +89,7 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_c
         """Tokenize example sequences using the model's pretrained tokenizer and align labels."""
         # Tokenize input examples
         tokenized_inputs = tokenizer(
-            examples[eval_config.input_field],
+            examples[task_config.input_field],
             truncation=True,
             max_length=max_length,
             is_split_into_words=True
@@ -97,7 +97,7 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_c
 
         # Perform label alignment on the tokenized inputs
         labels = []
-        for i, label in enumerate(examples[eval_config.label_field]):
+        for i, label in enumerate(examples[task_config.label_field]):
             # Initialise word and label ID lists
             word_ids = tokenized_inputs.word_ids(batch_index=i)
             prev_word, label_ids = None, []
@@ -124,15 +124,15 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_c
     
     return tokenize_and_align_labels
 
-def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eval_config: EvalConfig, max_length: int):
+def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int):
     """
     Create a tokenization function for sequence classification tasks.
 
     Tokenises input sequences and maps string category labels to integer ids 
-    using the label2id mapping defined in EvalConfig.
+    using the label2id mapping defined in TaskConfig.
 
     :param tokenizer: Tokenizer for the model being fine-tuned.
-    :param eval_config: EvalConfig for the task.
+    :param task_config: TaskConfig for the task.
     :param max_length: Maximum sequence length.
     :return: Preprocessing function for use with dataset.map().
     """
@@ -140,7 +140,7 @@ def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eva
         """Tokenize and map example sequences using the model's pretrained tokenizer."""
         # Tokenize input examples
         tokenized_inputs = tokenizer(
-            examples[eval_config.input_field],
+            examples[task_config.input_field],
             truncation=True,
             max_length=max_length,
             padding=False
@@ -148,40 +148,40 @@ def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, eva
 
         # Map string labels to integer ids
         tokenized_inputs["labels"] = [
-            eval_config.label2id[category]
-            for category in examples[eval_config.label_field]
+            task_config.label2id[category]
+            for category in examples[task_config.label_field]
         ]
 
         return tokenized_inputs
     
     return tokenize_and_map_labels
 
-def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase, eval_config: EvalConfig, max_length: int, num_proc: int):
+def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int, num_proc: int):
     """
     Tokenize and prepare an evaluation dataset for fine-tuning.
     
     :param dataset: DatasetDict loaded from disk.
     :param tokenizer: Tokenizer for the model being fine-tuned.
-    :param eval_config: EvalConfig for the task.
+    :param task_config: TaskConfig for the task.
     :param max_length: Maximum sequence length.
     :param num_proc: Number of processes used for preprocessing.
     :return: Tokenized DatasetDict with all splits provided.
     """
     # Select the appropriate preprocessor function
-    if eval_config.task_type == EvalTaskType.TOKEN_CLASSIFICATION:
+    if task_config.task_type == TaskType.TOKEN_CLASSIFICATION:
         preprocessor = token_classification_preprocessor(
             tokenizer, 
-            eval_config, 
+            task_config, 
             max_length
         )
-        description = f"Tokenising and aligning labels for {eval_config.task_name}"
+        description = f"Tokenising and aligning labels for {task_config.task_name}"
     else:
         preprocessor = sequence_classification_preprocessor(
             tokenizer, 
-            eval_config, 
+            task_config, 
             max_length
         )
-        description = f"Tokenising and mapping labels for {eval_config.task_name}"
+        description = f"Tokenising and mapping labels for {task_config.task_name}"
 
     # Remove column names from the dataset
     column_names = dataset["train"].column_names
@@ -204,9 +204,9 @@ def main() -> None:
 
     # Load model and evaluation configs
     model_config = ModelConfig.from_yaml(args.model_config)
-    eval_config = EvalConfig.from_yaml(args.eval_config)
+    task_config = TaskConfig.from_yaml(args.task_config)
     logger.info(f"Model: {model_config.model_name_or_path}")
-    logger.info(f"Task: {eval_config.task_name} ({eval_config.task_type.value})")
+    logger.info(f"Task: {task_config.task_name} ({task_config.task_type.value})")
 
     # Initialise the model's tokenizer
     hf_logging.set_verbosity_error()
@@ -214,7 +214,7 @@ def main() -> None:
     hf_logging.set_verbosity_warning()
 
     # Load evaluation dataset from disk
-    dataset_path = Path(eval_config.dataset_path) / args.language
+    dataset_path = Path(task_config.dataset_path) / args.language
     logger.info(f"Loading dataset from {dataset_path}...")
     dataset = cast(DatasetDict, load_from_disk(str(dataset_path)))
     logger.info(f"Loaded splits: { {k: len(v) for k, v in dataset.items()} }")
@@ -223,7 +223,7 @@ def main() -> None:
     processed_dataset = preprocess_dataset(
         dataset=dataset, 
         tokenizer=tokenizer, 
-        eval_config=eval_config,
+        task_config=task_config,
         max_length=model_config.max_seq_length,
         num_proc=args.nproc
     )
