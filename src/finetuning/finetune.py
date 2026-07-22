@@ -5,7 +5,7 @@ For each CPT checkpoint, this script performs the following:
 1. Loads the preprocessed evaluation dataset from disk.
 2. Fine-tunes a task-specific head on a downstream dataset.
 3. Evaluates on the test split.
-4. Saves results alongside the checkpoint.
+4. Saves results alongside the checkpoint, under a seed-specific subfolder.
 """
 
 import os
@@ -36,7 +36,7 @@ from transformers import (
 
 from sklearn.metrics import classification_report
 
-from src.evaluation.config import EvalConfig, EvalMetric, EvalTaskType
+from src.finetuning.config import FinetuneConfig, TaskConfig, TaskMetric, TaskType
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -46,7 +46,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constant Values
-RANDOM_SEED = 42
 IGNORE_INDEX = -100
 IS_GPU_AVAILABLE = torch.cuda.is_available()
 
@@ -62,10 +61,16 @@ def parse_args() -> Namespace:
         help="Path to directory containing CPT checkpoints."
     )
     parser.add_argument(
-        "--eval-config",
+        "--task-config",
         type=str,
         required=True,
         help="Path to evaluation task YAML config."
+    )
+    parser.add_argument(
+        "--finetune-config",
+        type=str,
+        required=True,
+        help="Path to fine-tuning YAML config."
     )
     parser.add_argument(
         "--preprocessed-dir",
@@ -78,6 +83,12 @@ def parse_args() -> Namespace:
         type=str,
         required=True,
         help="Directory to save fine-tuning results to disk."
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for this fine-tuning run."
     )
     return parser.parse_args()
 
@@ -117,14 +128,14 @@ def unpack_predictions(prediction: EvalPrediction):
     predictions = np.argmax(logits, axis=-1)
     return predictions, labels
 
-def create_compute_metrics(eval_config: EvalConfig):
+def create_compute_metrics(task_config: TaskConfig):
     """
     Create a compute_metrics function for the HuggingFace Trainer.
 
-    :param eval_config: EvalConfig for the task.
+    :param task_config: TaskConfig for the task.
     :return: compute_metrics function compatible with HuggingFace Trainer.
     """
-    if eval_config.metric == EvalMetric.SPAN_F1:
+    if task_config.metric == TaskMetric.SPAN_F1:
         seqeval = load_metric("seqeval")
         
         def compute_metrics(prediction: EvalPrediction):
@@ -143,8 +154,8 @@ def create_compute_metrics(eval_config: EvalConfig):
                 for label_id, prediction_id in zip(label_seq, prediction_seq):
                     # Skip padding tokens with label -100
                     if label_id != IGNORE_INDEX:
-                        true_label_seq.append(eval_config.label_names[label_id])
-                        true_prediction_seq.append(eval_config.label_names[prediction_id])
+                        true_label_seq.append(task_config.label_names[label_id])
+                        true_prediction_seq.append(task_config.label_names[prediction_id])
 
                 true_labels.append(true_label_seq)
                 true_predictions.append(true_prediction_seq)
@@ -170,7 +181,7 @@ def create_compute_metrics(eval_config: EvalConfig):
                 "per_class_f1": per_class_f1
             }
         
-    elif eval_config.metric == EvalMetric.ACCURACY:
+    elif task_config.metric == TaskMetric.ACCURACY:
         accuracy_metric = load_metric("accuracy")
 
         def compute_metrics(prediction: EvalPrediction):
@@ -199,14 +210,14 @@ def create_compute_metrics(eval_config: EvalConfig):
             report = cast(dict, classification_report(
                 true_labels,
                 true_predictions,
-                labels=list(range(len(eval_config.label_names))),
-                target_names=eval_config.label_names,
+                labels=list(range(len(task_config.label_names))),
+                target_names=task_config.label_names,
                 output_dict=True,
                 zero_division=0
             ))
             per_class_f1 = {
                 tag: report[tag]["f1-score"]
-                for tag in eval_config.label_names
+                for tag in task_config.label_names
                 if tag in report
             }
 
@@ -215,7 +226,7 @@ def create_compute_metrics(eval_config: EvalConfig):
                 "per_class_f1": per_class_f1
             }
         
-    elif eval_config.metric == EvalMetric.WEIGHTED_F1:
+    elif task_config.metric == TaskMetric.WEIGHTED_F1:
         # Extract logits and labels, then compute predicted label IDs
         f1_metric = load_metric("f1")
 
@@ -234,14 +245,14 @@ def create_compute_metrics(eval_config: EvalConfig):
             report = cast(dict, classification_report(
                 labels,
                 predictions,
-                labels=list(range(len(eval_config.label_names))),
-                target_names=eval_config.label_names,
+                labels=list(range(len(task_config.label_names))),
+                target_names=task_config.label_names,
                 output_dict=True,
                 zero_division=0
             ))
             per_class_f1 = {
                 category: report[category]["f1-score"]
-                for category in eval_config.label_names
+                for category in task_config.label_names
                 if category in report
             }
 
@@ -252,24 +263,26 @@ def create_compute_metrics(eval_config: EvalConfig):
 
     else:
         raise ValueError(
-            f"Unsupported metric: {eval_config.metric}. "
+            f"Unsupported metric: {task_config.metric}. "
             f"Expected one of: seqeval, accuracy, f1_weighted."
         )
     
     return compute_metrics
 
-def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, dataset: DatasetDict, output_dir: Path) -> dict[str, object]:
+def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetune_config: FinetuneConfig, dataset: DatasetDict, output_dir: Path, seed: int) -> dict[str, object]:
     """
     Fine-tune a CPT checkpoint on a single downstream task and evaluate it on the test split.
     
     :param checkpoint_path: Path to the CPT checkpoint.
-    :param eval_config: EvalConfig for the task.
+    :param task_config: TaskConfig for the task.
+    :param finetune_config: FinetuneConfig with fine-tuning hyperparameters.
     :param dataset: Preprocessed DatasetDict loaded from disk.
     :param output_dir: Directory to save fine-tuning results to.
+    :param seed: Random seed for this fine-tuning run.
     :return: Dict containing test metrics and full training log history.
     """
     step = checkpoint_path.name
-    logger.info(f"Fine-tuning {step} on {eval_config.task_name}")
+    logger.info(f"Fine-tuning {step} on {task_config.task_name} (seed={seed})")
 
     # Load tokenizer from the CPT checkpoint
     hf_logging.set_verbosity_error()
@@ -279,47 +292,47 @@ def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, datase
     def model_init():
         """Load a CPT checkpoint with a newly initialised task-specific head."""
         kwargs = dict(
-            num_labels=eval_config.num_labels,
-            id2label=eval_config.id2label,
-            label2id=eval_config.label2id,
+            num_labels=task_config.num_labels,
+            id2label=task_config.id2label,
+            label2id=task_config.label2id,
             ignore_mismatched_sizes=True  # Randomly initialise the task-specific head and reuse the CPT encoder weights
         )
 
         # Load the checkpoint with the appropriate task-specific classification head
-        if eval_config.task_type == EvalTaskType.TOKEN_CLASSIFICATION:
+        if task_config.task_type == TaskType.TOKEN_CLASSIFICATION:
             return AutoModelForTokenClassification.from_pretrained(checkpoint_path, **kwargs)
         else:
             return AutoModelForSequenceClassification.from_pretrained(checkpoint_path, **kwargs)
         
     # Select the data collator for the downstream task
-    if eval_config.task_type == EvalTaskType.TOKEN_CLASSIFICATION:
+    if task_config.task_type == TaskType.TOKEN_CLASSIFICATION:
         data_collator = DataCollatorForTokenClassification(tokenizer)
     else:
         data_collator = DataCollatorWithPadding(tokenizer)
 
     # Output directory for this (checkpoint, task) pair
-    run_dir = output_dir / step / eval_config.task_name
+    run_dir = output_dir / step / task_config.task_name / f"seed-{seed}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # Configure W&B run name for this fine-tuning run
-    if eval_config.wandb_project:
-        os.environ["WANDB_PROJECT"] = eval_config.wandb_project
+    if finetune_config.wandb_project:
+        os.environ["WANDB_PROJECT"] = finetune_config.wandb_project
         
     wandb_project = os.environ.get("WANDB_PROJECT")
-    run_name = f"{step}-{eval_config.task_name}" if wandb_project else None
+    run_name = f"{step}-{task_config.task_name}-seed-{seed}" if wandb_project else None
 
     # Training arguments
     training_args = TrainingArguments(
         output_dir=str(run_dir),
-        num_train_epochs=eval_config.epochs,
-        learning_rate=eval_config.learning_rate,
-        per_device_train_batch_size=eval_config.batch_size,
-        per_device_eval_batch_size=eval_config.batch_size,
-        warmup_steps=eval_config.warmup_steps,
+        num_train_epochs=finetune_config.epochs,
+        learning_rate=finetune_config.learning_rate,
+        per_device_train_batch_size=finetune_config.batch_size,
+        per_device_eval_batch_size=finetune_config.batch_size,
+        warmup_steps=finetune_config.warmup_steps,
         eval_strategy="epoch",
         save_strategy="no",
         logging_strategy="epoch",
-        seed=RANDOM_SEED,
+        seed=seed,
         report_to="wandb" if wandb_project else "none",
         run_name=run_name,
         bf16=IS_GPU_AVAILABLE,
@@ -336,20 +349,21 @@ def finetune_and_evaluate(checkpoint_path: Path, eval_config: EvalConfig, datase
         train_dataset=dataset["train"],
         eval_dataset=dataset["validation"],
         data_collator=data_collator,
-        compute_metrics=create_compute_metrics(eval_config)
+        compute_metrics=create_compute_metrics(task_config)
     )
 
     trainer.train()
 
     # Evaluate on test split
-    logger.info(f"Evaluating {step} / {eval_config.task_name} on test split...")
+    logger.info(f"Evaluating {step} / {task_config.task_name} on test split...")
     test_metrics = trainer.evaluate(cast(DatasetDict, dataset["test"]))
 
     results = {
         "checkpoint": step,
-        "task": eval_config.task_name,
+        "task": task_config.task_name,
+        "seed": seed,
         "test_metrics": test_metrics,
-        "log_history": trainer.state.log_history
+        "log_history": trainer.state.log_history,
     }
 
     # Save results alongside the checkpoint
@@ -380,9 +394,10 @@ def main() -> None:
     checkpoints = discover_checkpoints(checkpoint_dir)
     logger.info(f"Found {len(checkpoints)} checkpoints in {checkpoint_dir}")
 
-    # Load evaluation configuration
-    eval_config = EvalConfig.from_yaml(args.eval_config)
-    logger.info(f"Task: {eval_config.task_name} ({eval_config.task_type.value})")
+    # Load task and fine-tuning configurations
+    task_config = TaskConfig.from_yaml(args.task_config)
+    finetune_config = FinetuneConfig.from_yaml(args.finetune_config)
+    logger.info(f"Task: {task_config.task_name} ({task_config.task_type.value}), seed={args.seed}")
 
     # Load preprocessed evaluation dataset from disk
     dataset = cast(DatasetDict, load_from_disk(args.preprocessed_dir))
@@ -392,12 +407,14 @@ def main() -> None:
     for checkpoint_path in checkpoints:
         finetune_and_evaluate(
             checkpoint_path=checkpoint_path,
-            eval_config=eval_config,
+            finetune_config=finetune_config,
+            task_config=task_config,
             dataset=dataset,
-            output_dir=output_dir
+            output_dir=output_dir,
+            seed=args.seed
         )
 
-    logger.info(f"Fine-tuning and evaluation complete for {eval_config.task_name}.")
+    logger.info(f"Fine-tuning and evaluation complete for {task_config.task_name}.")
 
 if __name__ == '__main__':
     main()

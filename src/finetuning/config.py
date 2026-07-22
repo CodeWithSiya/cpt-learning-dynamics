@@ -1,4 +1,6 @@
-"""Configuration for downstream evaluation tasks."""
+"""
+Configurations for finetuning and downstream evaluation tasks.
+"""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -7,19 +9,19 @@ from typing import Union, Optional
 
 import yaml
 
-class EvalTaskType(Enum):
+class TaskType(Enum):
     """Enum which represents a downstream evaluation task type."""
     TOKEN_CLASSIFICATION = "token_classification"
     SEQUENCE_CLASSIFICATION = "sequence_classification"
 
-class EvalMetric(Enum):
+class TaskMetric(Enum):
     """Enum which represents a downstream evaluation metric."""
     SPAN_F1 = "seqeval"
     ACCURACY = "accuracy" 
     WEIGHTED_F1 = "f1_weighted"
 
 @dataclass
-class EvalConfig:
+class TaskConfig:
     """
     Configuration for a single downstream evaluation task.
 
@@ -30,35 +32,18 @@ class EvalConfig:
         input_field: Column name containing the model input.
         label_field: Column name containing the true labels.
         label_names: List of label names corresponding to integer label ids.
-        learning_rate: Fine-tuning learning rate.
-        epochs: Number of fine-tuning epochs.
-        batch_size: Per-device batch size.
-        warmup_steps: Number of linear warmup steps.
         metric: Metric used for task evaluation.
     """
     task_name: str
-    task_type: EvalTaskType
+    task_type: TaskType
     dataset_path: str
     input_field: str
     label_field: str
     label_names: list[str]
-    learning_rate: float
-    epochs: int
-    batch_size: int
-    warmup_steps: int
-    metric: EvalMetric
-    wandb_project: Optional[str] = None
+    metric: TaskMetric
 
     def __post_init__(self) -> None:
         """Validate configuration values after construction."""
-        if self.learning_rate <= 0:
-            raise ValueError(f"learning_rate must be positive, got {self.learning_rate}")
-        if self.epochs <= 0:
-            raise ValueError(f"epochs must be positive, got {self.epochs}")
-        if self.batch_size <= 0:
-            raise ValueError(f"batch_size must be positive, got {self.batch_size}")
-        if self.warmup_steps < 0:
-            raise ValueError(f"warmup_steps must be non-negative, got {self.warmup_steps}")
         if not self.label_names:
             raise ValueError("label_names must not be empty")
         
@@ -78,15 +63,55 @@ class EvalConfig:
         return {label: i for i, label in enumerate(self.label_names)}
     
     @classmethod
-    def from_yaml(cls, path: Union[str, Path]) -> "EvalConfig":
+    def from_yaml(cls, path: Union[str, Path]) -> "TaskConfig":
         """
-        Load an EvalConfig from a YAML file.
+        Load an TaskConfig from a YAML file.
 
         :param path: Path to the YAML config file.
-        :return: Populated EvalConfig instance.
+        :return: Populated TaskConfig instance.
         """
         with open(path) as f:
             data = yaml.safe_load(f)
-        data["task_type"] = EvalTaskType(data["task_type"])
-        data["metric"] = EvalMetric(data["metric"])
+        data["task_type"] = TaskType(data["task_type"])
+        data["metric"] = TaskMetric(data["metric"])
+        return cls(**data)
+    
+@dataclass
+class FinetuneConfig:
+    """
+    Configuration for fine-tuning hyperparameters, shared across all checkpoints and models for a given task.
+
+    Attributes:
+        learning_rate: Fine-tuning learning rate.
+        epochs: Number of fine-tuning epochs.
+        batch_size: Per-device batch size.
+        warmup_steps: Number of linear warmup steps.
+    """
+    learning_rate: float
+    epochs: int
+    batch_size: int
+    warmup_steps: int
+    wandb_project: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Validate configuration values after construction."""
+        if self.learning_rate <= 0:
+            raise ValueError(f"learning_rate must be positive, got {self.learning_rate}")
+        if self.epochs <= 0:
+            raise ValueError(f"epochs must be positive, got {self.epochs}")
+        if self.batch_size <= 0:
+            raise ValueError(f"batch_size must be positive, got {self.batch_size}")
+        if self.warmup_steps < 0:
+            raise ValueError(f"warmup_steps must be non-negative, got {self.warmup_steps}")
+        
+    @classmethod
+    def from_yaml(cls, path: Union[str, Path]) -> "FinetuneConfig":
+        """
+        Load a FinetuneConfig from a YAML file.
+
+        :param path: Path to the YAML config file.
+        :return: Populated FinetuneConfig instance.
+        """
+        with open(path) as f:
+            data = yaml.safe_load(f)
         return cls(**data)

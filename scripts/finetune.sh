@@ -41,6 +41,9 @@ ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 # All evaluation tasks
 ALL_TASKS=("ner" "pos" "ntc")
 
+# All random seeds for variance estimation
+ALL_SEEDS=(42 123 456 789 1738)
+
 # Language subset being evaluated
 LANGUAGE="xho"
 
@@ -52,20 +55,32 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
+# Second script argument selects a single seed; if omitted, loop through all seeds
+SEED_ARG="$2"
+if [ -n "${SEED_ARG}" ]; then
+    SEEDS=("${SEED_ARG}")
+else
+    SEEDS=("${ALL_SEEDS[@]}")
+fi
+
 for model in "${MODELS[@]}"; do
     for task in "${ALL_TASKS[@]}"; do
-        echo "=== Fine-tuning and evaluating ${model} on ${task} ==="
+        for seed in "${SEEDS[@]}"; do
+            echo "=== Fine-tuning and evaluating ${model} on ${task}, seed ${seed} ==="
 
-        uv run accelerate launch \
-            --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-            --num_machines 1 \
-            --dynamo_backend no \
-            --mixed_precision bf16 \
-            --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-            src/evaluation/finetune.py \
-            --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
-            --eval-config configs/evaluation/${task}.yaml \
-            --preprocessed-dir datasets/processed/evaluation/${model}/${LANGUAGE}/${task} \
-            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning
+            uv run accelerate launch \
+                --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+                --num_machines 1 \
+                --dynamo_backend no \
+                --mixed_precision bf16 \
+                --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
+                src/finetuning/finetune.py \
+                --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
+                --task-config configs/evaluation/${task}.yaml \
+                --finetune-config configs/finetuning/${task}.yaml \
+                --preprocessed-dir datasets/processed/evaluation/${model}/${LANGUAGE}/${task} \
+                --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
+                --seed ${seed}
+        done
     done
 done
