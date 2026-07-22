@@ -67,7 +67,7 @@ def plot_train_loss_curve(log_history: list[dict], model_name: str, output_path:
     train_points = []
 
     for entry in log_history:
-        step = max(entry["step"], 1)
+        step = entry["step"]
 
         if "loss" in entry:
             train_points.append((step, entry["loss"]))
@@ -107,7 +107,7 @@ def plot_eval_loss_curve(log_history: list[dict], model_name: str, output_path: 
     eval_points = []
 
     for entry in log_history:
-        step = max(entry["step"], 1)
+        step = entry["step"]
 
         if "eval_loss" in entry:
             eval_points.append((step, entry["eval_loss"]))
@@ -125,7 +125,6 @@ def plot_eval_loss_curve(log_history: list[dict], model_name: str, output_path: 
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel("Validation Loss")
     ax.set_title(f"Continued Pretraining Validation Loss ({model_name})")
-    ax.set_xscale("log")
     ax.grid(True, linestyle="--", alpha=0.5)
 
     # Save the figure

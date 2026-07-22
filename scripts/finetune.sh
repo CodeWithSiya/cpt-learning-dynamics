@@ -42,7 +42,7 @@ ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 ALL_TASKS=("ner" "pos" "ntc")
 
 # All random seeds for variance estimation
-ALL_SEEDS=(42 123 456 789 1738)
+ALL_SEEDS=(42)
 
 # Language subset being evaluated
 LANGUAGE="xho"
