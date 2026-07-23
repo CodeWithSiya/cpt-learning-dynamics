@@ -33,7 +33,7 @@ def parse_args() -> Namespace:
         "--task",
         type=str,
         required=True,
-        help="Task to plot (ner, pos, ntc)."
+        help="Task to plot."
     )
     parser.add_argument(
         "--seed",

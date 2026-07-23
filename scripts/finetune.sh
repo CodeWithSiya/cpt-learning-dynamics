@@ -5,7 +5,7 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=4
-#SBATCH --time=47:59:00
+#SBATCH --time=23:59:00
 #SBATCH --job-name="cpt-finetune"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -42,7 +42,7 @@ ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 ALL_TASKS=("ner" "pos" "ntc")
 
 # All random seeds for variance estimation
-ALL_SEEDS=(42)
+ALL_SEEDS=(42 123 456)
 
 # Language subset being evaluated
 LANGUAGE="xho"

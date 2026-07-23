@@ -1,6 +1,6 @@
 # Fine-Tuning Configuration
 learning_rate: 2.0e-5
-epochs: 20
+epochs: 2
 batch_size: 32
 warmup_steps: 0
 
