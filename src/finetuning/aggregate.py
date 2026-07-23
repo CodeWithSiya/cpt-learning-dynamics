@@ -54,9 +54,9 @@ def checkpoint_step(path: Path) -> int:
     """Extract the training step number from a checkpoint directory name."""
     return int(path.name.split("-")[1])
 
-def load_all_seed_results(results_dir: Path, task: str) -> dict[int, list[dict]]:
+def load_seed_results(results_dir: Path, task: str) -> dict[int, list[dict]]:
     """
-    Load all seed results for a given task, grouped by checkpoint step.
+    Load seed results for a given task, grouped by checkpoint step.
 
     :param results_dir: Root directory containing checkpoint result folders.
     :param task: Name of the evaluation task.
@@ -134,7 +134,7 @@ def main() -> None:
     args = parse_args()
 
     results_dir = Path(args.results_dir)
-    results_by_step = load_all_seed_results(results_dir, args.task)
+    results_by_step = load_seed_results(results_dir, args.task)
 
     if not results_by_step:
         logger.error(f"No results found for task '{args.task}' in {results_dir}")
