@@ -30,6 +30,12 @@ def parse_args() -> Namespace:
         help="Root directory containing finetuning results."
     )
     parser.add_argument(
+        "--task",
+        type=str,
+        required=True,
+        help="Task to plot (ner, pos, ntc)."
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         required=True,
