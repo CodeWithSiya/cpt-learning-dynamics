@@ -330,7 +330,8 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
         per_device_eval_batch_size=finetune_config.batch_size,
         warmup_steps=finetune_config.warmup_steps,
         eval_strategy="epoch",
-        save_strategy="no",
+        save_strategy="epoch",
+        save_total_limit=1,
         logging_strategy="epoch",
         seed=seed,
         report_to="wandb" if wandb_project else "none",
@@ -339,8 +340,10 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
         use_cpu=not IS_GPU_AVAILABLE,
         dataloader_num_workers=4,
         dataloader_pin_memory=IS_GPU_AVAILABLE,
-        load_best_model_at_end=False,
-    )
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+)
 
     # Model training
     trainer = Trainer(
