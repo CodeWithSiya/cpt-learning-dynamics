@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -18,6 +19,9 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Width of the linear region of the symlog step axis, shared by the scale and its locator
+LINTHRESH = 100
 
 # Evaluation metric for each task
 TASK_METRICS = {
@@ -67,6 +71,20 @@ def load_aggregated_results(path: Path) -> dict[int, dict]:
     logger.info(f"Loaded aggregated results for {len(aggregated)} checkpoints.")
     return aggregated
 
+def configure_step_axis(ax, steps: list[int]) -> None:
+    """
+    Configure the checkpoint step axis.
+
+    :param ax: Axes to configure.
+    :param steps: Checkpoint steps being plotted.
+    """
+    final_step = max(steps)
+
+    ax.set_xscale("symlog", linthresh=LINTHRESH)
+    ax.set_xlim(0, final_step)
+    ax.xaxis.set_major_locator(ticker.SymmetricalLogLocator(base=10, linthresh=LINTHRESH))
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+
 def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, output_path: Path) -> None:
     """
     Plot per-class F1 scores across continued pretraining checkpoints.
@@ -78,7 +96,6 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, output_path:
     fig, ax = plt.subplots(figsize=(10, 6))
 
     steps = sorted(aggregated.keys())
-    plot_steps = [max(s, 1) for s in steps]
 
     # Collect all classes across checkpoints
     class_names = set()
@@ -90,14 +107,14 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, output_path:
         means = np.array([aggregated[s]["per_class_mean"].get(class_name, np.nan) for s in steps])
         stds = np.array([aggregated[s]["per_class_std"].get(class_name, 0.0) for s in steps])
 
-        line, = ax.plot(plot_steps, means, label=class_name, linewidth=1.3)
-        ax.fill_between(plot_steps, means - stds, means + stds, alpha=0.15, color=line.get_color())
+        line, = ax.plot(steps, means, label=class_name, linewidth=1.3)
+        ax.fill_between(steps, means - stds, means + stds, alpha=0.15, color=line.get_color())
 
     # Add labels and formatting
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel("F1")
     ax.set_title(f"{task.upper()} Per-Class Learning Dynamics")
-    ax.set_xscale("log")
+    configure_step_axis(ax, steps)
     ax.set_ylim(0, 1)
     ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=8, frameon=True)
     ax.grid(True, alpha=0.3, linestyle=":")
@@ -121,20 +138,19 @@ def plot_overall_dynamics(aggregated: dict[int, dict], metric_name: str, task: s
     fig, ax = plt.subplots(figsize=(10, 6))
 
     steps = sorted(aggregated.keys())
-    plot_steps = [max(s, 1) for s in steps]
 
     means = np.array([aggregated[s]["overall_mean"] for s in steps])
     stds = np.array([aggregated[s]["overall_std"] for s in steps])
 
     # Plot the mean metric and standard deviation
-    ax.plot(plot_steps, means, color="tab:blue", linewidth=1.5)
-    ax.fill_between(plot_steps, means - stds, means + stds, alpha=0.2, color="tab:blue")
+    ax.plot(steps, means, color="tab:blue", linewidth=1.5)
+    ax.fill_between(steps, means - stds, means + stds, alpha=0.2, color="tab:blue")
 
     # Add labels and formatting
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel(metric_name.capitalize())
     ax.set_title(f"{task.upper()} Overall {metric_name.capitalize()}")
-    ax.set_xscale("log")
+    configure_step_axis(ax, steps)
     ax.set_ylim(0, 1)
     ax.grid(True, alpha=0.3, linestyle=":")
 
