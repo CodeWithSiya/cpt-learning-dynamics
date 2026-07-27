@@ -37,6 +37,13 @@ ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 # All evaluation tasks
 ALL_TASKS=("ner" "pos" "ntc")
 
+# Display names used in plot titles
+declare -A MODEL_DISPLAY_NAMES=(
+    ["roberta"]="RoBERTa"
+    ["xlmr"]="XLMR"
+    ["nguni-xlmr"]="Nguni-XLMR"
+)
+
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
 if [ -n "${MODEL_ARG}" ]; then
@@ -46,19 +53,21 @@ else
 fi
 
 for model in "${MODELS[@]}"; do
+    # Aggregate results across seeds, one file per task
     for task in "${ALL_TASKS[@]}"; do
-        echo "=== Aggregating and plotting ${task} for ${model} ==="
+        echo "=== Aggregating ${task} results for ${model} ==="
 
-        # Aggregate results across seeds
         uv run python src/finetuning/aggregate.py \
             --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
             --task ${task} \
             --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated/${task}_aggregated.json
-
-        # Plot learning dynamics from aggregated results
-        uv run python src/visualisation/plot_dynamics.py \
-            --aggregated-results ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated/${task}_aggregated.json \
-            --task ${task} \
-            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots
     done
+
+    # Plot learning dynamics from the aggregated results
+    echo "=== Plotting learning dynamics for ${model} ==="
+
+    uv run python src/visualisation/plot_dynamics.py \
+        --aggregated-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated \
+        --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
+        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots
 done
