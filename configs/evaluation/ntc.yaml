@@ -16,4 +16,4 @@ label_names:
   - "sports"
 
 # Evaluation Configuration
-metric: "f1_weighted"
+metric: "sequence"
