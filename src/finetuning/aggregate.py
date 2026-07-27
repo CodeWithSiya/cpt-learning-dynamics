@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Evaluation metric for each task
 TASK_METRICS = {
     "ner": "f1",
-    "pos": "accuracy",
+    "pos": "f1",
     "ntc": "f1"
 }
 
@@ -90,6 +90,17 @@ def load_seed_results(results_dir: Path, task: str) -> dict[int, list[dict]]:
     logger.info(f"Loaded results for task '{task}' from {len(results_by_step)} checkpoints.")
     return results_by_step
 
+def sample_std(values: list[float]) -> float:
+    """
+    Compute the sample standard deviation across seeds.
+
+    :param values: Metric values, one per seed.
+    :return: Sample standard deviation, or 0.0 for fewer than two values.
+    """
+    if len(values) < 2:
+        return 0.0
+    return float(np.std(values, ddof=1))
+
 def aggregate_step_results(seed_results: list[dict], overall_metric_key: str) -> dict:
     """
     Compute mean and standard deviation across seeds for one checkpoint.
@@ -118,13 +129,13 @@ def aggregate_step_results(seed_results: list[dict], overall_metric_key: str) ->
         "num_seeds": len(seed_results),
         "seeds": [result.get("seed") for result in seed_results],
         "overall_mean": float(np.mean(overall_values)) if overall_values else None,
-        "overall_std": float(np.std(overall_values)) if overall_values else None,
+        "overall_std": sample_std(overall_values) if overall_values else None,
         "per_class_mean": {
             class_name: float(np.mean(scores))
             for class_name, scores in per_class_values.items()
         },
         "per_class_std": {
-            class_name: float(np.std(scores))
+            class_name: sample_std(scores)
             for class_name, scores in per_class_values.items()
         }
     }

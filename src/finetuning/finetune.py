@@ -12,7 +12,9 @@ import os
 import json
 import logging
 import argparse
+import shutil
 import warnings
+from copy import deepcopy
 from dotenv import load_dotenv
 from argparse import Namespace
 from pathlib import Path
@@ -137,9 +139,16 @@ def create_compute_metrics(task_config: TaskConfig):
     """
     if task_config.metric == TaskMetric.SPAN_F1:
         seqeval = load_metric("seqeval")
-        
+
+        # Fixed set of entity types, so the macro F1 denominator is constant across checkpoints
+        entity_types = list(dict.fromkeys(
+            label.split("-", 1)[1]
+            for label in task_config.label_names
+            if "-" in label
+        ))
+
         def compute_metrics(prediction: EvalPrediction):
-            """Compute Span-level F1 for NER."""
+            """Compute span-level per-class F1 for NER, aggregated as macro F1."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
 
@@ -167,25 +176,29 @@ def create_compute_metrics(task_config: TaskConfig):
             ) or {}
 
             # Extract per-entity-type F1 for learning dynamics plotting
-            per_class_f1 = {
-                entity_type: metrics["f1"]
-                for entity_type, metrics in results.items()
-                if isinstance(metrics, dict) and "f1" in metrics
-            }
+            per_class_f1 = {}
+            for entity_type in entity_types:
+                metrics = results.get(entity_type)
+                per_class_f1[entity_type] = (
+                    float(metrics["f1"])
+                    if isinstance(metrics, dict) and "f1" in metrics else 0.0
+                )
+
+            # Compute Macro F1 score
+            macro_f1 = (
+                sum(per_class_f1.values()) / len(per_class_f1)
+                if per_class_f1 else 0.0
+            )
 
             return {
-                "precision": results.get("overall_precision", 0.0),
-                "recall": results.get("overall_recall", 0.0),
-                "f1": results.get("overall_f1", 0.0),
-                "accuracy": results.get("overall_accuracy", 0.0),
+                "f1": macro_f1,
                 "per_class_f1": per_class_f1
             }
         
-    elif task_config.metric == TaskMetric.ACCURACY:
-        accuracy_metric = load_metric("accuracy")
+    elif task_config.metric == TaskMetric.TOKEN_F1:
 
         def compute_metrics(prediction: EvalPrediction):
-            """Compute accuracy for POS Tagging."""
+            """Compute token-level per-class F1 for POS, aggregated as macro F1."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
 
@@ -199,12 +212,6 @@ def create_compute_metrics(task_config: TaskConfig):
                     if label_id != IGNORE_INDEX:
                         true_labels.append(label_id)
                         true_predictions.append(prediction_id)
-
-            # Compute accuracy result
-            result = accuracy_metric.compute(
-                predictions=true_predictions,
-                references=true_labels
-            ) or {}
 
             # Per-tag F1 breakdown for learning dynamics plotting
             report = cast(dict, classification_report(
@@ -221,25 +228,20 @@ def create_compute_metrics(task_config: TaskConfig):
                 if tag in report
             }
 
+            # Compute macro F1
+            macro_f1 = report["macro avg"]["f1-score"]
+
             return {
-                "accuracy": result.get("accuracy", 0.0),
+                "f1": macro_f1,
                 "per_class_f1": per_class_f1
             }
         
-    elif task_config.metric == TaskMetric.WEIGHTED_F1:
-        # Extract logits and labels, then compute predicted label IDs
-        f1_metric = load_metric("f1")
+    elif task_config.metric == TaskMetric.SEQUENCE_F1:
 
         def compute_metrics(prediction: EvalPrediction):
-            """Compute weighted F1 for NTC."""
+            """Compute sequence-level per-class F1 for NTC, aggregated as macro F1."""
+            # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
-
-            # Compute and return weighted F1 result
-            result = f1_metric.compute(
-                predictions=predictions,
-                references=labels,
-                average="weighted",
-            ) or {}
 
             # Per-category F1 breakdown for learning dynamics plotting
             report = cast(dict, classification_report(
@@ -256,15 +258,18 @@ def create_compute_metrics(task_config: TaskConfig):
                 if category in report
             }
 
+            # Compute macro F1
+            macro_f1 = report["macro avg"]["f1-score"]
+
             return {
-                "f1": result.get("f1", 0.0),
+                "f1": macro_f1,
                 "per_class_f1": per_class_f1
             }
 
     else:
         raise ValueError(
             f"Unsupported metric: {task_config.metric}. "
-            f"Expected one of: seqeval, accuracy, f1_weighted."
+            f"Expected one of: span, token, sequence."
         )
     
     return compute_metrics
@@ -330,7 +335,8 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
         per_device_eval_batch_size=finetune_config.batch_size,
         warmup_steps=finetune_config.warmup_steps,
         eval_strategy="epoch",
-        save_strategy="no",
+        save_strategy="epoch",
+        save_total_limit=1,
         logging_strategy="epoch",
         seed=seed,
         report_to="wandb" if wandb_project else "none",
@@ -339,7 +345,9 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
         use_cpu=not IS_GPU_AVAILABLE,
         dataloader_num_workers=4,
         dataloader_pin_memory=IS_GPU_AVAILABLE,
-        load_best_model_at_end=False,
+        load_best_model_at_end=True,
+        metric_for_best_model=f"eval_{task_config.best_model_metric}",
+        greater_is_better=True,
     )
 
     # Model training
@@ -354,6 +362,9 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
 
     trainer.train()
 
+    # Snapshot the training log history before evaluating on the test split
+    log_history = deepcopy(trainer.state.log_history)
+
     # Evaluate on test split
     logger.info(f"Evaluating {step} / {task_config.task_name} on test split...")
     test_metrics = trainer.evaluate(cast(DatasetDict, dataset["test"]))
@@ -363,7 +374,7 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
         "task": task_config.task_name,
         "seed": seed,
         "test_metrics": test_metrics,
-        "log_history": trainer.state.log_history,
+        "log_history": log_history,
     }
 
     # Save results alongside the checkpoint
@@ -371,6 +382,10 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
     with open(results_path,"w") as f:
         json.dump(results, f, indent=2)
     logger.info(f"Saved results to {results_path}")
+
+    # Discard the fine-tuned weights and keep only the metrics for this (checkpoint, task, seed)
+    for checkpoint in run_dir.glob("checkpoint-*"):
+        shutil.rmtree(checkpoint, ignore_errors=True)
 
     return results
 

@@ -20,4 +20,4 @@ label_names:
   - "I-DATE"
 
 # Evaluation Configuration
-metric: "seqeval"
+metric: "span"

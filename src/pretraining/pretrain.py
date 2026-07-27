@@ -81,6 +81,10 @@ class CheckpointScheduleCallback(TrainerCallback):
         :param state: TrainerState tracking process.
         :param control: TrainerControl flags.
         """
+        if state.global_step > 0:
+            print("Resuming training.", flush=True)
+            return
+
         if 0 in self.checkpoint_steps and state.is_world_process_zero:
             model = kwargs.get("model")
             if model is not None:

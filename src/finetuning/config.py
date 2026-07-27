@@ -16,9 +16,9 @@ class TaskType(Enum):
 
 class TaskMetric(Enum):
     """Enum which represents a downstream evaluation metric."""
-    SPAN_F1 = "seqeval"
-    ACCURACY = "accuracy" 
-    WEIGHTED_F1 = "f1_weighted"
+    SPAN_F1 = "span"
+    TOKEN_F1 = "token" 
+    SEQUENCE_F1 = "sequence"
 
 @dataclass
 class TaskConfig:
@@ -52,6 +52,11 @@ class TaskConfig:
         """Number of labels for this task."""
         return len(self.label_names)
     
+    @property
+    def best_model_metric(self) -> str:
+        """Name of the metric used to select the best checkpoint during fine-tuning."""
+        return "f1"
+
     @property
     def id2label(self) -> dict[int, str]:
         """Mapping from integer id to label name."""

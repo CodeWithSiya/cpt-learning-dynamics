@@ -72,6 +72,44 @@ def parse_args() -> Namespace:
 
     return parser.parse_args()
     
+def validate_label_names(dataset: DatasetDict, task_config: TaskConfig) -> None:
+    """
+    Check that the label names in the task config match the labels in the dataset.
+
+    :param dataset: DatasetDict loaded from disk.
+    :param task_config: TaskConfig for the task.
+    :raises ValueError: If the config labels disagree with the dataset labels.
+    """
+    feature = dataset["train"].features[task_config.label_field]
+
+    # Token-level labels are a sequence of class labels, so unwrap the inner feature
+    class_label = getattr(feature, "feature", feature)
+    dataset_label_names = getattr(class_label, "names", None)
+
+    # Integer label ids: the config ordering must match the dataset ordering exactly
+    if dataset_label_names is not None:
+        if list(dataset_label_names) != list(task_config.label_names):
+            raise ValueError(
+                f"label_names in the '{task_config.task_name}' config do not match the dataset.\n"
+                f"  config:  {list(task_config.label_names)}\n"
+                f"  dataset: {list(dataset_label_names)}"
+            )
+        logger.info(f"Validated {len(dataset_label_names)} label names against the dataset.")
+        return
+
+    # String labels: ordering is set by the config, so only check that every label is covered
+    observed = set()
+    for split in dataset.values():
+        observed.update(split.unique(task_config.label_field))
+
+    unknown = observed - set(task_config.label_names)
+    if unknown:
+        raise ValueError(
+            f"Dataset contains labels missing from the '{task_config.task_name}' config: "
+            f"{sorted(unknown)}"
+        )
+    logger.info(f"Validated {len(observed)} label values against the dataset.")
+
 def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int):
     """
     Create a preprocessing function for token classification tasks.
@@ -218,6 +256,9 @@ def main() -> None:
     logger.info(f"Loading dataset from {dataset_path}...")
     dataset = cast(DatasetDict, load_from_disk(str(dataset_path)))
     logger.info(f"Loaded splits: { {k: len(v) for k, v in dataset.items()} }")
+
+    # Validate label names
+    validate_label_names(dataset, task_config)
 
     # Preprocess the dataset
     processed_dataset = preprocess_dataset(
