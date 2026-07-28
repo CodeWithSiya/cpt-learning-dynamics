@@ -86,6 +86,20 @@ def metric_series(values: list) -> np.ndarray:
         dtype=float
     )
 
+def _format_power_of_ten(value: float, _pos: int) -> str:
+    """
+    Format a tick value as '0' or as clean power-of-ten notation (e.g. 10^3).
+
+    :param value: Tick value to format.
+    :param _pos: Tick position (unused, required by matplotlib's formatter API).
+    :return: Formatted tick label.
+    """
+    if value == 0:
+        return "0"
+
+    exponent = int(round(np.log10(value)))
+    return f"$10^{{{exponent}}}$"
+
 def configure_step_axis(ax, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis, shared by every learning dynamics plot.
@@ -100,7 +114,7 @@ def configure_step_axis(ax, steps: list[int]) -> None:
     ax.set_xlim(0, max(steps))
     ax.xaxis.set_major_locator(ticker.SymmetricalLogLocator(base=10, linthresh=linthresh))
     ax.xaxis.set_minor_locator(ticker.NullLocator())
-    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(_format_power_of_ten))
 
 def configure_axes(ax, steps: list[int], title: str, scale: bool = True) -> None:
     """
@@ -165,29 +179,29 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
 def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], model_name: str, output_path: Path) -> None:
     """
     Plot the overall F1 for all tasks on a single figure.
- 
+
     :param aggregated_by_task: Mapping from task name to aggregated results.
     :param model_name: Model name, used in the plot title.
     :param output_path: File path to save the plot image to.
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
- 
+
     all_steps = []
- 
+
     # Plot the mean F1 for each task
     for i, (task, aggregated) in enumerate(aggregated_by_task.items()):
         steps = sorted(aggregated.keys())
         all_steps.extend(steps)
- 
+
         means = metric_series([aggregated[s]["overall_mean"] for s in steps])
         color = PALETTE[i % len(PALETTE)]
- 
+
         ax.plot(steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
- 
+
     # Add labels and formatting
-    configure_axes(ax, sorted(set(all_steps)), f"Overall Learning Dynamics ({model_name})", False)
+    configure_axes(ax, sorted(set(all_steps)), f"Learning Dynamics ({model_name})", scale=False)
     ax.legend(loc="lower right", fontsize=9)
- 
+
     save_figure(fig, output_path, "all-tasks overview")
 
 def main() -> None:

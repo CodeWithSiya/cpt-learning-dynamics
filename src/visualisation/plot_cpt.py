@@ -85,7 +85,6 @@ def plot_train_loss_curve(log_history: list[dict], model_name: str, output_path:
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel("Training Loss")
     ax.set_title(f"Continued Pretraining Training Loss ({model_name})")
-    ax.set_xscale("log")
     ax.grid(True, linestyle="--", alpha=0.5)
 
     # Save the figure
