@@ -1,6 +1,6 @@
 """
 Plot learning dynamics curves from aggregated fine-tuning results across
-CPT checkpoints, with shaded standard deviation bands across seeds.
+CPT checkpoints.
 """
 
 import argparse
@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 # Figure styling
 FIGURE_SIZE = (10, 6)
 LINE_WIDTH = 1.4
-BAND_ALPHA = 0.2
 
 # Evaluation metric for each task
 TASK_METRICS = {
@@ -31,6 +30,9 @@ TASK_METRICS = {
     "pos": "f1",
     "ntc": "f1"
 }
+
+# Colour palette, one colour per task
+PALETTE = ["lightcoral", "cornflowerblue", "lightgreen"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -100,19 +102,20 @@ def configure_step_axis(ax, steps: list[int]) -> None:
     ax.xaxis.set_minor_locator(ticker.NullLocator())
     ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
 
-def configure_axes(ax, steps: list[int], title: str) -> None:
+def configure_axes(ax, steps: list[int], title: str, scale: bool = True) -> None:
     """
     Apply the shared labels, scales and grid styling to a learning dynamics plot.
 
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted.
+    :param scale: Whether to scale the y-axis or not.
     :param title: Plot title.
     """
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel("F1")
     ax.set_title(title)
     configure_step_axis(ax, steps)
-    ax.set_ylim(0, 1)
+    if scale: ax.set_ylim(0, 1) 
     ax.grid(True, alpha=0.3, linestyle=":")
 
 def save_figure(fig, output_path: Path, description: str) -> None:
@@ -147,15 +150,11 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
     for step_data in aggregated.values():
         class_names.update(step_data["per_class_mean"].keys())
 
-    # Plot the mean F1 and standard deviation for each class
+    # Plot the mean F1 for each class
     for class_name in sorted(class_names):
         means = metric_series([aggregated[s]["per_class_mean"].get(class_name) for s in steps])
-        stds = np.nan_to_num(
-            metric_series([aggregated[s]["per_class_std"].get(class_name) for s in steps])
-        )
 
-        line, = ax.plot(steps, means, label=class_name, linewidth=LINE_WIDTH)
-        ax.fill_between(steps, means - stds, means + stds, alpha=BAND_ALPHA, color=line.get_color())
+        ax.plot(steps, means, label=class_name, linewidth=LINE_WIDTH)
 
     # Add labels and formatting
     configure_axes(ax, steps, f"{task.upper()} Per-Class Learning Dynamics ({model_name})")
@@ -166,30 +165,29 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
 def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], model_name: str, output_path: Path) -> None:
     """
     Plot the overall F1 for all tasks on a single figure.
-
+ 
     :param aggregated_by_task: Mapping from task name to aggregated results.
     :param model_name: Model name, used in the plot title.
     :param output_path: File path to save the plot image to.
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
-
+ 
     all_steps = []
-
-    # Plot the mean F1 and standard deviation for each task
-    for task, aggregated in aggregated_by_task.items():
+ 
+    # Plot the mean F1 for each task
+    for i, (task, aggregated) in enumerate(aggregated_by_task.items()):
         steps = sorted(aggregated.keys())
         all_steps.extend(steps)
-
+ 
         means = metric_series([aggregated[s]["overall_mean"] for s in steps])
-        stds = np.nan_to_num(metric_series([aggregated[s]["overall_std"] for s in steps]))
-
-        line, = ax.plot(steps, means, label=task.upper(), linewidth=LINE_WIDTH)
-        ax.fill_between(steps, means - stds, means + stds, alpha=BAND_ALPHA, color=line.get_color())
-
+        color = PALETTE[i % len(PALETTE)]
+ 
+        ax.plot(steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
+ 
     # Add labels and formatting
-    configure_axes(ax, sorted(set(all_steps)), f"Overall Learning Dynamics ({model_name})")
+    configure_axes(ax, sorted(set(all_steps)), f"Overall Learning Dynamics ({model_name})", False)
     ax.legend(loc="lower right", fontsize=9)
-
+ 
     save_figure(fig, output_path, "all-tasks overview")
 
 def main() -> None:
