@@ -1,6 +1,5 @@
 """
-Plot learning dynamics curves from aggregated fine-tuning results across
-CPT checkpoints.
+Plot learning dynamics curves from aggregated fine-tuning results across CPT checkpoints.
 """
 
 import argparse
@@ -86,17 +85,27 @@ def metric_series(values: list) -> np.ndarray:
         dtype=float
     )
 
-def _format_power_of_ten(value: float, _pos: int) -> str:
+def clamp_for_log(steps: list[int]) -> list[int]:
     """
-    Format a tick value as '0' or as clean power-of-ten notation (e.g. 10^3).
+    Replace step 0 with 1 so it can be plotted on a log axis.
+
+    A true log scale can't represent 0 (log(0) is undefined), so matplotlib
+    silently drops any zero-valued point. Remapping it to 1 keeps the
+    initial checkpoint visible, landing exactly at the 10^0 tick.
+
+    :param steps: Checkpoint steps, possibly including 0.
+    :return: Steps with 0 replaced by 1.
+    """
+    return [max(step, 1) for step in steps]
+
+def format_power_of_ten(value: float, _pos: int) -> str:
+    """
+    Format a tick value as clean power-of-ten notation.
 
     :param value: Tick value to format.
     :param _pos: Tick position (unused, required by matplotlib's formatter API).
     :return: Formatted tick label.
     """
-    if value == 0:
-        return "0"
-
     exponent = int(round(np.log10(value)))
     return f"$10^{{{exponent}}}$"
 
@@ -104,17 +113,18 @@ def configure_step_axis(ax, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis, shared by every learning dynamics plot.
 
-    :param ax: Axes to configure.
-    :param steps: Checkpoint steps being plotted.
-    """
-    nonzero_steps = [step for step in steps if step > 0]
-    linthresh = min(nonzero_steps) if nonzero_steps else 1
+    Uses a pure log scale so major ticks land on powers of ten at equal
+    intervals throughout training. Expects steps already passed through
+    clamp_for_log, so all values are >= 1.
 
-    ax.set_xscale("symlog", linthresh=linthresh, linscale=0.5)
-    ax.set_xlim(0, max(steps))
-    ax.xaxis.set_major_locator(ticker.SymmetricalLogLocator(base=10, linthresh=linthresh))
+    :param ax: Axes to configure.
+    :param steps: Checkpoint steps being plotted (already clamped, all >= 1).
+    """
+    ax.set_xscale("log")
+    ax.set_xlim(min(steps), max(steps))
+    ax.xaxis.set_major_locator(ticker.LogLocator(base=10))
     ax.xaxis.set_minor_locator(ticker.NullLocator())
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(_format_power_of_ten))
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_power_of_ten))
 
 def configure_axes(ax, steps: list[int], title: str, scale: bool = True) -> None:
     """
@@ -158,6 +168,7 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
 
     steps = sorted(aggregated.keys())
+    plot_steps = clamp_for_log(steps)
 
     # Collect all classes across checkpoints
     class_names = set()
@@ -168,10 +179,10 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
     for class_name in sorted(class_names):
         means = metric_series([aggregated[s]["per_class_mean"].get(class_name) for s in steps])
 
-        ax.plot(steps, means, label=class_name, linewidth=LINE_WIDTH)
+        ax.plot(plot_steps, means, label=class_name, linewidth=LINE_WIDTH)
 
     # Add labels and formatting
-    configure_axes(ax, steps, f"{task.upper()} Per-Class Learning Dynamics ({model_name})")
+    configure_axes(ax, plot_steps, f"{task.upper()} Per-Class Learning Dynamics ({model_name})")
     ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=8, frameon=True)
 
     save_figure(fig, output_path, f"{task} per-class")
@@ -192,14 +203,15 @@ def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], model_na
     for i, (task, aggregated) in enumerate(aggregated_by_task.items()):
         steps = sorted(aggregated.keys())
         all_steps.extend(steps)
+        plot_steps = clamp_for_log(steps)
 
         means = metric_series([aggregated[s]["overall_mean"] for s in steps])
         color = PALETTE[i % len(PALETTE)]
 
-        ax.plot(steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
+        ax.plot(plot_steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
 
     # Add labels and formatting
-    configure_axes(ax, sorted(set(all_steps)), f"Learning Dynamics ({model_name})", scale=False)
+    configure_axes(ax, clamp_for_log(sorted(set(all_steps))), f"Learning Dynamics ({model_name})", scale=False)
     ax.legend(loc="lower right", fontsize=9)
 
     save_figure(fig, output_path, "all-tasks overview")
