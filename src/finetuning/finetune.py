@@ -213,18 +213,22 @@ def create_compute_metrics(task_config: TaskConfig):
                         true_labels.append(label_id)
                         true_predictions.append(prediction_id)
 
+            # Restrict scoring to tags that occur in the references
+            present_ids = sorted(set(true_labels))
+            present_tags = [task_config.label_names[label_id] for label_id in present_ids]
+
             # Per-tag F1 breakdown for learning dynamics plotting
             report = cast(dict, classification_report(
                 true_labels,
                 true_predictions,
-                labels=list(range(len(task_config.label_names))),
-                target_names=task_config.label_names,
+                labels=present_ids,
+                target_names=present_tags,
                 output_dict=True,
                 zero_division=0
             ))
             per_class_f1 = {
                 tag: report[tag]["f1-score"]
-                for tag in task_config.label_names
+                for tag in present_tags
                 if tag in report
             }
 
@@ -333,7 +337,7 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
         learning_rate=finetune_config.learning_rate,
         per_device_train_batch_size=finetune_config.batch_size,
         per_device_eval_batch_size=finetune_config.batch_size,
-        warmup_steps=finetune_config.warmup_steps,
+        warmup_ratio=finetune_config.warmup_ratio,
         eval_strategy="epoch",
         save_strategy="epoch",
         save_total_limit=1,

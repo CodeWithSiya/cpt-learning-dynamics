@@ -90,12 +90,12 @@ class FinetuneConfig:
         learning_rate: Fine-tuning learning rate.
         epochs: Number of fine-tuning epochs.
         batch_size: Per-device batch size.
-        warmup_steps: Number of linear warmup steps.
+        warmup_ratio: Ratio of linear warmup steps.
     """
     learning_rate: float
     epochs: int
     batch_size: int
-    warmup_steps: int
+    warmup_ratio: float
     wandb_project: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -106,8 +106,8 @@ class FinetuneConfig:
             raise ValueError(f"epochs must be positive, got {self.epochs}")
         if self.batch_size <= 0:
             raise ValueError(f"batch_size must be positive, got {self.batch_size}")
-        if self.warmup_steps < 0:
-            raise ValueError(f"warmup_steps must be non-negative, got {self.warmup_steps}")
+        if not 0 <= self.warmup_ratio <= 1:
+            raise ValueError(f"warmup_ratio must be between 0 and 1, got {self.warmup_ratio}")
         
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "FinetuneConfig":
