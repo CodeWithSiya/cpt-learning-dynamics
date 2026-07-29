@@ -112,11 +112,7 @@ def format_power_of_ten(value: float, _pos: int) -> str:
 def configure_step_axis(ax, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis, shared by every learning dynamics plot.
-
-    Uses a pure log scale so major ticks land on powers of ten at equal
-    intervals throughout training. Expects steps already passed through
-    clamp_for_log, so all values are >= 1.
-
+    
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted (already clamped, all >= 1).
     """
