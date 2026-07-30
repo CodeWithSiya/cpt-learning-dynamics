@@ -26,4 +26,4 @@ logging_steps: 100
 
 # Experiment Tracking
 wandb_project: "cpt-learning-dynamics"
-wandb_run_name: "roberta-large-cpt-final"
+wandb_run_name: "roberta-large-cpt-200k"
