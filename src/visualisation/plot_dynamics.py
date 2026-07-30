@@ -33,6 +33,10 @@ TASK_METRICS = {
 # Colour palette, one colour per task
 PALETTE = ["lightcoral", "cornflowerblue", "lightgreen"]
 
+# Width of the symlog linear region
+SYMLOG_LINTHRESH = 1
+SYMLOG_LINSCALE = 1.0
+
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -87,11 +91,7 @@ def metric_series(values: list) -> np.ndarray:
 
 def clamp_for_log(steps: list[int]) -> list[int]:
     """
-    Replace step 0 with 1 so it can be plotted on a log axis.
-
-    A true log scale can't represent 0 (log(0) is undefined), so matplotlib
-    silently drops any zero-valued point. Remapping it to 1 keeps the
-    initial checkpoint visible, landing exactly at the 10^0 tick.
+    Replace step 0 with 1 so it can be plotted on a log-style axis.
 
     :param steps: Checkpoint steps, possibly including 0.
     :return: Steps with 0 replaced by 1.
@@ -103,7 +103,7 @@ def format_power_of_ten(value: float, _pos: int) -> str:
     Format a tick value as clean power-of-ten notation.
 
     :param value: Tick value to format.
-    :param _pos: Tick position (unused, required by matplotlib's formatter API).
+    :param _pos: Tick position.
     :return: Formatted tick label.
     """
     exponent = int(round(np.log10(value)))
@@ -112,13 +112,17 @@ def format_power_of_ten(value: float, _pos: int) -> str:
 def configure_step_axis(ax, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis, shared by every learning dynamics plot.
-    
+
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted (already clamped, all >= 1).
     """
-    ax.set_xscale("log")
-    ax.set_xlim(min(steps), max(steps))
-    ax.xaxis.set_major_locator(ticker.LogLocator(base=10))
+    max_step = max(steps)
+    highest = int(np.floor(np.log10(max_step)))
+    ticks = [float(10 ** exponent) for exponent in range(0, highest + 1)]
+
+    ax.set_xscale("symlog", linthresh=SYMLOG_LINTHRESH, linscale=SYMLOG_LINSCALE)
+    ax.set_xlim(min(steps), max_step)
+    ax.xaxis.set_major_locator(ticker.FixedLocator(ticks))
     ax.xaxis.set_minor_locator(ticker.NullLocator())
     ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_power_of_ten))
 
@@ -260,3 +264,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
