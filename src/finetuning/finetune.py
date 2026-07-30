@@ -36,7 +36,7 @@ from transformers import (
     logging as hf_logging
 )
 
-from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score, classification_report
 
 from src.finetuning.config import FinetuneConfig, TaskConfig, TaskMetric, TaskType
 
@@ -148,7 +148,7 @@ def create_compute_metrics(task_config: TaskConfig):
         ))
 
         def compute_metrics(prediction: EvalPrediction):
-            """Compute span-level per-class F1 for NER, aggregated as macro F1."""
+            """Compute span-level per-class F1 for NER, plus macro and micro overall F1."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
 
@@ -191,14 +191,17 @@ def create_compute_metrics(task_config: TaskConfig):
             )
 
             return {
-                "f1": macro_f1,
+                "f1": macro_f1,                                    
+                "precision": results.get("overall_precision", 0.0),
+                "recall": results.get("overall_recall", 0.0),
+                "micro_f1": results.get("overall_f1", 0.0),
                 "per_class_f1": per_class_f1
             }
-        
+
     elif task_config.metric == TaskMetric.TOKEN_F1:
 
         def compute_metrics(prediction: EvalPrediction):
-            """Compute token-level per-class F1 for POS, aggregated as macro F1."""
+            """Compute token-level per-class F1 for POS, plus macro F1 and accuracy."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
 
@@ -213,7 +216,7 @@ def create_compute_metrics(task_config: TaskConfig):
                         true_labels.append(label_id)
                         true_predictions.append(prediction_id)
 
-            # Restrict scoring to tags that occur in the references
+            # Restrict scoring to tags that actually occur in the references
             present_ids = sorted(set(true_labels))
             present_tags = [task_config.label_names[label_id] for label_id in present_ids]
 
@@ -232,18 +235,17 @@ def create_compute_metrics(task_config: TaskConfig):
                 if tag in report
             }
 
-            # Compute macro F1
-            macro_f1 = report["macro avg"]["f1-score"]
-
             return {
-                "f1": macro_f1,
+                "f1": report["macro avg"]["f1-score"],
+                "accuracy": accuracy_score(true_labels, true_predictions),
+                "weighted_f1": report["weighted avg"]["f1-score"],
                 "per_class_f1": per_class_f1
             }
-        
+
     elif task_config.metric == TaskMetric.SEQUENCE_F1:
 
         def compute_metrics(prediction: EvalPrediction):
-            """Compute sequence-level per-class F1 for NTC, aggregated as macro F1."""
+            """Compute sequence-level per-class F1 for NTC, plus macro F1 and accuracy."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
 
@@ -262,11 +264,10 @@ def create_compute_metrics(task_config: TaskConfig):
                 if category in report
             }
 
-            # Compute macro F1
-            macro_f1 = report["macro avg"]["f1-score"]
-
             return {
-                "f1": macro_f1,
+                "f1": report["macro avg"]["f1-score"], 
+                "accuracy": report["accuracy"],
+                "weighted_f1": report["weighted avg"]["f1-score"],
                 "per_class_f1": per_class_f1
             }
 
@@ -275,7 +276,7 @@ def create_compute_metrics(task_config: TaskConfig):
             f"Unsupported metric: {task_config.metric}. "
             f"Expected one of: span, token, sequence."
         )
-    
+
     return compute_metrics
 
 def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetune_config: FinetuneConfig, dataset: DatasetDict, output_dir: Path, seed: int) -> dict[str, object]:
