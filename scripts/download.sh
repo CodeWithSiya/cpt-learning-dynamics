@@ -34,7 +34,7 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # Download WURA isiXhosa corpus
-uv run python src/data/download_corpus.py \
+uv run python src/data/download_wura.py \
     --language xho \
     --output-dir datasets/raw/corpus
 
