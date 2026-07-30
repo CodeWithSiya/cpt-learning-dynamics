@@ -33,10 +33,6 @@ TASK_METRICS = {
 # Colour palette, one colour per task
 PALETTE = ["lightcoral", "cornflowerblue", "lightgreen"]
 
-# Width of the symlog linear region
-SYMLOG_LINTHRESH = 1
-SYMLOG_LINSCALE = 1.0
-
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -89,42 +85,16 @@ def metric_series(values: list) -> np.ndarray:
         dtype=float
     )
 
-def clamp_for_log(steps: list[int]) -> list[int]:
-    """
-    Replace step 0 with 1 so it can be plotted on a log-style axis.
-
-    :param steps: Checkpoint steps, possibly including 0.
-    :return: Steps with 0 replaced by 1.
-    """
-    return [max(step, 1) for step in steps]
-
-def format_power_of_ten(value: float, _pos: int) -> str:
-    """
-    Format a tick value as clean power-of-ten notation.
-
-    :param value: Tick value to format.
-    :param _pos: Tick position.
-    :return: Formatted tick label.
-    """
-    exponent = int(round(np.log10(value)))
-    return f"$10^{{{exponent}}}$"
-
 def configure_step_axis(ax, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis, shared by every learning dynamics plot.
 
     :param ax: Axes to configure.
-    :param steps: Checkpoint steps being plotted (already clamped, all >= 1).
+    :param steps: Checkpoint steps being plotted.
     """
-    max_step = max(steps)
-    highest = int(np.floor(np.log10(max_step)))
-    ticks = [float(10 ** exponent) for exponent in range(0, highest + 1)]
-
-    ax.set_xscale("symlog", linthresh=SYMLOG_LINTHRESH, linscale=SYMLOG_LINSCALE)
-    ax.set_xlim(min(steps), max_step)
-    ax.xaxis.set_major_locator(ticker.FixedLocator(ticks))
-    ax.xaxis.set_minor_locator(ticker.NullLocator())
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_power_of_ten))
+    ax.set_xlim(min(steps), max(steps))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10, steps=[1, 2, 5, 10]))
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
 
 def configure_axes(ax, steps: list[int], title: str, scale: bool = True) -> None:
     """
@@ -168,7 +138,6 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
 
     steps = sorted(aggregated.keys())
-    plot_steps = clamp_for_log(steps)
 
     # Collect all classes across checkpoints
     class_names = set()
@@ -179,10 +148,10 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
     for class_name in sorted(class_names):
         means = metric_series([aggregated[s]["per_class_mean"].get(class_name) for s in steps])
 
-        ax.plot(plot_steps, means, label=class_name, linewidth=LINE_WIDTH)
+        ax.plot(steps, means, label=class_name, linewidth=LINE_WIDTH)
 
     # Add labels and formatting
-    configure_axes(ax, plot_steps, f"{task.upper()} Per-Class Learning Dynamics ({model_name})")
+    configure_axes(ax, steps, f"{task.upper()} Per-Class Learning Dynamics ({model_name})")
     ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=8, frameon=True)
 
     save_figure(fig, output_path, f"{task} per-class")
@@ -203,15 +172,14 @@ def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], model_na
     for i, (task, aggregated) in enumerate(aggregated_by_task.items()):
         steps = sorted(aggregated.keys())
         all_steps.extend(steps)
-        plot_steps = clamp_for_log(steps)
 
         means = metric_series([aggregated[s]["overall_mean"] for s in steps])
         color = PALETTE[i % len(PALETTE)]
 
-        ax.plot(plot_steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
+        ax.plot(steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
 
     # Add labels and formatting
-    configure_axes(ax, clamp_for_log(sorted(set(all_steps))), f"Learning Dynamics ({model_name})", scale=False)
+    configure_axes(ax, sorted(set(all_steps)), f"Learning Dynamics ({model_name})", scale=False)
     ax.legend(loc="lower right", fontsize=9)
 
     save_figure(fig, output_path, "all-tasks overview")
@@ -264,4 +232,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    
