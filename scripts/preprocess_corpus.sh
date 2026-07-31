@@ -8,8 +8,8 @@
 #SBATCH --job-name="cpt-preprocess-corpus"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/preprocess_corpus_%j.log
-#SBATCH --error=logs/preprocess_corpus_%j.log
+#SBATCH --output=logs/preprocess_wura_%j.log
+#SBATCH --error=logs/preprocess_wura_%j.log
 
 # Update to latest commit
 git pull
@@ -52,7 +52,7 @@ for model in "${MODELS[@]}"; do
     echo "=== Preprocessing corpus for model: ${model} ==="
 
     # Preprocess train split
-    uv run python src/data/preprocess_corpus.py \
+    uv run python src/data/preprocess_wura.py \
         --input datasets/raw/corpus/${LANGUAGE} \
         --model-config configs/models/${model}.yaml \
         --output datasets/processed/corpus/${model}/${LANGUAGE}/train \
@@ -60,7 +60,7 @@ for model in "${MODELS[@]}"; do
         --nproc ${SLURM_CPUS_PER_TASK}
 
     # Preprocess validation split
-    uv run python src/data/preprocess_corpus.py \
+    uv run python src/data/preprocess_wura.py \
         --input datasets/raw/corpus/${LANGUAGE} \
         --model-config configs/models/${model}.yaml \
         --output datasets/processed/corpus/${model}/${LANGUAGE}/validation \
