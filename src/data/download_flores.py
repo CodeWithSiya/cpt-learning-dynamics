@@ -1,7 +1,7 @@
 """
-Download the WURA corpus from HuggingFace for CPT.
+Download the FLORES-200 devtest split for pseudo-perplexity evaluation.
 
-Dataset: https://huggingface.co/datasets/castorini/wura
+Dataset: https://huggingface.co/datasets/facebook/flores
 """
 
 import argparse
@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from argparse import Namespace
 from typing import cast, Optional
 
-from datasets import DatasetDict, load_dataset
+from datasets import Dataset, load_dataset
 from huggingface_hub import get_token
   
 # Configure logging to show timestamps and log level
@@ -24,19 +24,20 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# WURA dataset constants
-DATASET_NAME = "castorini/wura"
-SUPPORTED_LANGUAGES = ["xho"]
+# FLORES-200 dataset constants
+DATASET_NAME = "facebook/flores"
+SUPPORTED_LANGUAGES = ["xho_Latn"]
+SPLIT = "devtest"
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Download the WURA corpus from HuggingFace."
+        description="Download the FLORES-200 devtest split from HuggingFace."
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="datasets/raw/corpus",
+        default="datasets/raw/flores",
         help="Directory to save the downloaded dataset to disk."
     )
     parser.add_argument(
@@ -48,19 +49,19 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--language",
         type=str,
-        default="xho",
+        default="xho_Latn",
         choices=SUPPORTED_LANGUAGES,
-        help="WURA language subset to download."
+        help="FLORES-200 devtest subset to download."
     )
     return parser.parse_args()
 
-def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
+def load_flores(language: str, cache_dir: Optional[str] = None) -> Dataset:
     """
-    Load the given WURA language dataset from HuggingFace.
+    Load the given FLORES-200 language devtest split from HuggingFace.
     
-    :param language: WURA language subset to download.
+    :param language: FLORES-200 devtest language subset to download.
     :param cache_dir: Path to the HuggingFace cache directory.
-    :return: Dataset with 'train' and 'validation' splits.
+    :return: FLORES-200 Dataset for the devtest split.
     """
     logger.info(f"Loading {DATASET_NAME} ({language})...")
 
@@ -71,9 +72,10 @@ def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
     else:
         logger.info("No HuggingFace token found, proceeding without authentication")
 
-    dataset = cast(DatasetDict, load_dataset(
+    dataset = cast(Dataset, load_dataset(
         path=DATASET_NAME,
         name=language,
+        split=SPLIT,
         trust_remote_code=True,
         cache_dir=cache_dir,
         token=token,
@@ -82,29 +84,28 @@ def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
 
     return dataset
 
-def log_dataset_info(dataset: DatasetDict) -> None:
+def save_dataset(dataset: Dataset, output_dir: str) -> None:
     """
-    Log basic statistics about the loaded dataset.
-    
-    :param dataset: Loaded WURA DatasetDict.
-    """
-    logger.info(f"Dataset structure: {dataset}")
-    logger.info(f"Train samples: {len(dataset['train']):,}")
-    logger.info(f"Validation samples: {len(dataset['validation']):,}")
+    Save the FLORES-200 devtest dataset to disk in HuggingFace Arrow format.
 
-def save_dataset(dataset: DatasetDict, output_dir: str) -> None:
-    """
-    Save the WURA dataset to disk.
-    
-    :param dataset: Loaded WURA DatasetDict to save.
+    :param dataset: Loaded FLORES-200 devtest Dataset to save.
     :param output_dir: Directory path to save the dataset to.
     """
     os.makedirs(output_dir, exist_ok=True)
     dataset.save_to_disk(output_dir)
     logger.info(f"Dataset saved to {output_dir}")
 
+def log_dataset_info(dataset: Dataset) -> None:
+    """
+    Log basic statistics about the loaded dataset.
+
+    :param dataset: Loaded FLORES-200 devtest Dataset.
+    """
+    logger.info(f"Dataset structure: {dataset}")
+    logger.info(f"Devtest samples: {len(dataset):,}")
+
 def main() -> None:
-    """Main entry point for downloading the WURA corpus."""
+    """Main entry point for downloading the FLORES-200 isiXhosa devtest split."""
     args = parse_args()
 
     cache_dir = args.cache_dir or os.environ.get("HF_DATASETS_CACHE")
@@ -112,7 +113,7 @@ def main() -> None:
     # Include language in output path for multi-language support
     output_dir = os.path.join(args.output_dir, args.language)
 
-    dataset = load_wura(language=args.language, cache_dir=cache_dir)
+    dataset = load_flores(language=args.language, cache_dir=cache_dir)
     log_dataset_info(dataset)
     save_dataset(dataset, output_dir)
 

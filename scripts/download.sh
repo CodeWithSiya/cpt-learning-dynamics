@@ -39,6 +39,11 @@ uv run python src/data/download_wura.py \
     --output-dir datasets/raw/corpus
 
 # Download all evaluation datasets
-uv run python src/data/download_eval_data.py \
+uv run python src/data/download_eval.py \
     --language xho \
     --output-dir datasets/raw/evaluation
+
+# Download FLORES-200 isiXhosa dataset
+uv run python src/data/download_flores.py \
+    --language xho_Latn \
+    --output-dir datasets/raw/flores

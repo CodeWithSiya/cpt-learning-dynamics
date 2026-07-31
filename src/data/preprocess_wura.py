@@ -28,7 +28,7 @@ def parse_args() -> Namespace:
         "--input",
         type=str,
         required=True,
-        help="Path to the raw corpus on disk, as saved by download_corpus.py.",
+        help="Path to the raw corpus on disk, as saved by download_wura.py.",
     )
     parser.add_argument(
         "--model-config",
