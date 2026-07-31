@@ -2,7 +2,7 @@
 Continued Pretraining (CPT) script for encoder-only models on a given language.
 
 The script performs the following tasks:
-1. Loads a ModelConfig from YAML and a pre-tokenized corpus (produced by src/data/preprocess_corpus.py).
+1. Loads a ModelConfig from YAML and a pre-tokenized corpus (produced by src/data/preprocess_wura.py).
 2. Runs dynamic masked language modelling using the HuggingFace Trainer.
 3. Saves model checkpoints using the schedule defined in schedule.py.
 """ 
@@ -126,13 +126,13 @@ def parse_args() -> Namespace:
         "--train-corpus",
         type=str,
         required=True,
-        help="Path to the pre-tokenized training corpus on disk (output of src/data/preprocess_corpus.py)."
+        help="Path to the pre-tokenized training corpus on disk (output of src/data/preprocess_wura.py)."
     )
     parser.add_argument(
         "--validation-corpus",
         type=str,
         required=True,
-        help="Path to the pre-tokenized validation corpus on disk (output of src/data/preprocess_corpus.py)."
+        help="Path to the pre-tokenized validation corpus on disk (output of src/data/preprocess_wura.py)."
     )
     parser.add_argument(
         "--wandb-run-id",
