@@ -219,3 +219,15 @@ __marimo__/
 
 # Environment Variables
 .env
+
+# Datasets
+datasets
+
+# HuggingFace cache
+.cache/
+
+# Logs
+logs
+
+# Weights and Biases cache
+wandb

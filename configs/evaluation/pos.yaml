@@ -1,0 +1,32 @@
+# Task Configuration
+task_name: "pos"
+task_type: "token_classification"
+dataset_path: "datasets/raw/evaluation/pos"
+
+# Dataset Fields
+input_field: "tokens"
+label_field: "upos"
+
+# Label Configuration
+label_names:
+  - "NOUN"
+  - "PUNCT"
+  - "ADP"
+  - "NUM"
+  - "SYM"
+  - "SCONJ"
+  - "ADJ"
+  - "PART"
+  - "DET"
+  - "CCONJ"
+  - "PROPN"
+  - "PRON"
+  - "X"
+  - "_"
+  - "ADV"
+  - "INTJ"
+  - "VERB"
+  - "AUX"
+
+# Evaluation Configuration
+metric: "token"

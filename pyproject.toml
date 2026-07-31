@@ -15,7 +15,8 @@ dependencies = [
     "numpy>=2.0.0",
     "scikit-learn>=1.5.0",
     "seqeval>=1.2.2",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "huggingface-hub>=0.23.0"
 ]
 
 [tool.uv.sources]
@@ -28,8 +29,16 @@ name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "ipykernel>=6.29.0",
     "matplotlib>=3.9.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

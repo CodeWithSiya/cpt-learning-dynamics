@@ -1,0 +1,23 @@
+# Task Configuration
+task_name: "ner"
+task_type: "token_classification"
+dataset_path: "datasets/raw/evaluation/ner"
+
+# Dataset Fields
+input_field: "tokens"
+label_field: "ner_tags"
+
+# Label Configuration
+label_names:
+  - "O"
+  - "B-PER"
+  - "I-PER"
+  - "B-ORG"
+  - "I-ORG"
+  - "B-LOC"
+  - "I-LOC"
+  - "B-DATE"
+  - "I-DATE"
+
+# Evaluation Configuration
+metric: "span"
