@@ -50,9 +50,9 @@ fi
 
 # W&B run IDs per model, so resubmitted jobs resume the same run
 declare -A WANDB_RUN_IDS=(
-    ["roberta"]="roberta-large-cpt-final"
-    ["xlmr"]="xlmr-large-cpt-final"
-    ["nguni-xlmr"]="nguni-xlmr-large-cpt-final"
+    ["roberta"]="roberta-large-cpt-200k"
+    ["xlmr"]="xlmr-large-cpt-200k"
+    ["nguni-xlmr"]="nguni-xlmr-large-200k"
 )
 
 for model in "${MODELS[@]}"; do
