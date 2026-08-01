@@ -152,15 +152,18 @@ def compute_sentence_pll(sentence: str, model: PreTrainedModel, tokenizer: PreTr
 
         batch_input_ids = batch_input_ids.to(DEVICE)
 
-        # Compute token log-probabilities for the batch.
+        # Compute the logits for the batch.
         with torch.no_grad():
             logits = model(batch_input_ids).logits
-        log_probs = torch.log_softmax(logits, dim=-1)
+
+        # Keep only the logits at the masked positions before normalising
+        positions = torch.tensor(batch_positions, device=DEVICE)
+        masked_logits = logits[torch.arange(len(batch_positions), device=DEVICE), positions]
+        log_probs = torch.log_softmax(masked_logits, dim=-1)
 
         # Add the log-probability assigned to each original token.
-        for i, pos in enumerate(batch_positions):
-            true_token_id = input_ids[pos]
-            total_log_prob += log_probs[i, pos, true_token_id].item()
+        true_token_ids = input_ids[positions.cpu()].to(DEVICE)
+        total_log_prob += log_probs.gather(1, true_token_ids.unsqueeze(1)).sum().item()
 
     # Return the PLL together with the word count for downstream normalisation.
     word_count = len(sentence.split())
@@ -239,7 +242,7 @@ def main() -> None:
         with open(output_path, "w") as f:
             json.dump(results, f, indent=2)
 
-        logger.info(f"Saved pseudo-perplexity results for {len(results)} checkpoints to {output_path}")
+    logger.info(f"Saved pseudo-perplexity results for {len(results)} checkpoints to {output_path}")
 
 if __name__ == "__main__":
     main()

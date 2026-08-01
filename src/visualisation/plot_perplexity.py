@@ -96,14 +96,15 @@ def plot_perplexity_dynamics(perplexity_by_step: dict[int, dict], model_name: st
     steps = sorted(perplexity_by_step.keys())
     pppl = np.array([perplexity_by_step[s]["pseudo_perplexity"] for s in steps], dtype=float)
 
-    ax.plot(steps, pppl, linewidth=LINE_WIDTH, color="cornflowerblue")
+    ax.plot(steps, pppl, linewidth=LINE_WIDTH, color="lightcoral")
 
     # Add labels and formatting
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel("Pseudo-Perplexity (PPPL)")
     ax.set_title(f"Pseudo-Perplexity Dynamics ({model_name})")
     configure_step_axis(ax, steps)
-    ax.grid(True, alpha=0.3, linestyle=":")
+    ax.set_yscale("log")
+    ax.grid(True, alpha=0.3, linestyle=":", which="both")
 
     save_figure(fig, output_path, "pseudo-perplexity")
 
