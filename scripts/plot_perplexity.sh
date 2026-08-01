@@ -34,17 +34,10 @@ uv sync --frozen
 # All models available for plotting
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 
-# Display names used in plot titles
-declare -A MODEL_DISPLAY_NAMES=(
-    ["roberta"]="RoBERTa"
-    ["xlmr"]="XLMR"
-    ["nguni-xlmr"]="Nguni-XLMR"
-)
-
 # Language subset to plot
 LANGUAGE="xho_Latn"
 
-# First script argument selects a single model; if omitted, loop through all models
+# First script argument selects a single model; if omitted, plot all models
 MODEL_ARG="$1"
 if [ -n "${MODEL_ARG}" ]; then
     MODELS=("${MODEL_ARG}")
@@ -52,11 +45,11 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-for model in "${MODELS[@]}"; do
-    echo "=== Plotting pseudo-perplexity dynamics for ${model} ==="
+# Plot pseudo-perplexity dynamics
+echo "=== Plotting pseudo-perplexity dynamics for ${MODELS[@]} ==="
 
-    uv run python src/visualisation/plot_perplexity.py \
-        --perplexity-path ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/perplexity/${LANGUAGE}_perplexity.json \
-        --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
-        --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots/${LANGUAGE}_perplexity.png
-done
+uv run python src/visualisation/plot_perplexity.py \
+    --results-dir ${SCRATCH}/cpt-learning-dynamics/results \
+    --models "${MODELS[@]}" \
+    --language ${LANGUAGE} \
+    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/plots
