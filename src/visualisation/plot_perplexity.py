@@ -229,8 +229,7 @@ def main() -> None:
             output_path=model_plots_dir / f"{filename}_{args.language}_perplexity.png"
         )
 
-    # Plot pseudo-perplexity for all models on a single figure, leaving any existing
-    # overview untouched when only one model was plotted
+    # Plot pseudo-perplexity for all models on a single figure
     if len(perplexity_by_model) < 2:
         logger.info("Fewer than two models plotted, skipping the all-models overview.")
         return
