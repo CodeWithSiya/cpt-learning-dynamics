@@ -122,7 +122,6 @@ def configure_axes(ax, steps: list[int], title: str) -> None:
     ax.set_ylabel("Pseudo-Perplexity (PPPL)")
     ax.set_title(title)
     configure_step_axis(ax, steps)
-    ax.set_yscale("log")
     ax.grid(True, alpha=0.3, linestyle=":", which="both")
 
 def save_figure(fig, output_path: Path, description: str) -> None:
