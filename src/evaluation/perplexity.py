@@ -119,50 +119,62 @@ def compute_sentence_pll(sentence: str, model: PreTrainedModel, tokenizer: PreTr
     :param model: Model to evaluate.
     :param tokenizer: Tokenizer corresponding to the model being evaluated.
     :param batch_size: Number of masked variants to process per forward pass.
-    :return: A tuple containing the sentence PLL and the number of masked tokens.
+    :return: A tuple containing the sentence PLL and its whitespace word count.
     """
-    # Tokenise the sentence and add the model's special tokens.
+    # Tokenise the sentence and add the model's special tokens
     tokenized_sentence = tokenizer(
         sentence,
         return_tensors="pt",
         truncation=True,
-        max_length=MAX_SEQ_LENGTH
+        max_length=MAX_SEQ_LENGTH,
+        return_special_tokens_mask=True
     )
 
     input_ids = tokenized_sentence["input_ids"][0]
-    seq_len = input_ids.shape[0]
+    special_tokens_mask = tokenized_sentence["special_tokens_mask"][0]
 
-    # Only mask content tokens, leaving special tokens unchanged.
-    mask_positions = list(range(1, seq_len - 1))
+    # The PLL would cover only the retained prefix while the word count below covers
+    # the whole sentence, silently deflating PPPL, so flag any sentence that truncates.
+    if input_ids.shape[0] >= MAX_SEQ_LENGTH:
+        logger.warning(
+            f"Sentence truncated at {MAX_SEQ_LENGTH} tokens; its PLL will be "
+            f"normalised by the untruncated word count, deflating PPPL."
+        )
+
+    # Only mask content tokens, leaving special tokens unchanged
+    mask_positions = (special_tokens_mask == 0).nonzero(as_tuple=True)[0].tolist()
     if not mask_positions:
         return 0.0, 0
 
-    # Cache the mask token id and initialise the running PLL total.
+    # Cache the mask token id and initialise the running PLL total
     mask_id = tokenizer.mask_token_id
     total_log_prob = 0.0
 
-    # Process masked sentence variants in batches.
+    # Process masked sentence variants in batches
     for batch_start in range(0, len(mask_positions), batch_size):
         batch_positions = mask_positions[batch_start:batch_start + batch_size]
 
-        # Create one masked copy of the sentence for each target position.
+        # Create one masked copy of the sentence for each target position
         batch_input_ids = input_ids.unsqueeze(0).repeat(len(batch_positions), 1)
         for i, pos in enumerate(batch_positions):
             batch_input_ids[i, pos] = mask_id
 
         batch_input_ids = batch_input_ids.to(DEVICE)
 
-        # Compute token log-probabilities for the batch.
+        # Compute the logits for the batch
         with torch.no_grad():
             logits = model(batch_input_ids).logits
-        log_probs = torch.log_softmax(logits, dim=-1)
 
-        # Add the log-probability assigned to each original token.
-        for i, pos in enumerate(batch_positions):
-            true_token_id = input_ids[pos]
-            total_log_prob += log_probs[i, pos, true_token_id].item()
+        # Keep only the logits at the masked positions before normalising
+        positions = torch.tensor(batch_positions, device=DEVICE)
+        masked_logits = logits[torch.arange(len(batch_positions), device=DEVICE), positions]
+        log_probs = torch.log_softmax(masked_logits, dim=-1)
 
-    # Return the PLL together with the word count for downstream normalisation.
+        # Add the log-probability assigned to each original token
+        true_token_ids = input_ids[positions.cpu()].to(DEVICE)
+        total_log_prob += log_probs.gather(1, true_token_ids.unsqueeze(1)).sum().item()
+
+    # Return the PLL together with the word count for downstream normalisation
     word_count = len(sentence.split())
     return total_log_prob, word_count
 
@@ -209,8 +221,16 @@ def main() -> None:
     checkpoints = discover_checkpoints(checkpoint_dir)
     logger.info(f"Found {len(checkpoints)} checkpoints in {checkpoint_dir}")
 
+    if not checkpoints:
+        raise ValueError(f"No 'step-' checkpoint directories found in {checkpoint_dir}.")
+
     # Load the FLORES-200 devtest sentences
     sentences = load_flores_sentences(flores_dir)
+
+    # CPT leaves the tokenizer unchanged, so load it once from the first checkpoint
+    hf_logging.set_verbosity_error()
+    tokenizer = AutoTokenizer.from_pretrained(checkpoints[0])
+    hf_logging.set_verbosity_warning()
 
     results = {}
 
@@ -218,9 +238,8 @@ def main() -> None:
         step = checkpoint_step(checkpoint_path)
         logger.info(f"Computing pseudo-perplexity for {checkpoint_path.name}...")
 
-        # Load the tokenizer and model for this checkpoint
+        # Load the model for this checkpoint
         hf_logging.set_verbosity_error()
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
         model = AutoModelForMaskedLM.from_pretrained(checkpoint_path).to(DEVICE)
         model.eval()
         hf_logging.set_verbosity_warning()
@@ -239,7 +258,7 @@ def main() -> None:
         with open(output_path, "w") as f:
             json.dump(results, f, indent=2)
 
-        logger.info(f"Saved pseudo-perplexity results for {len(results)} checkpoints to {output_path}")
+    logger.info(f"Saved pseudo-perplexity results for {len(results)} checkpoints to {output_path}")
 
 if __name__ == "__main__":
     main()
