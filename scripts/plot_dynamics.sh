@@ -69,5 +69,5 @@ for model in "${MODELS[@]}"; do
     uv run python src/visualisation/plot_dynamics.py \
         --aggregated-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated \
         --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
-        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots
+        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots/dynamics
 done

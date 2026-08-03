@@ -55,5 +55,5 @@ for model in "${MODELS[@]}"; do
     uv run python src/visualisation/plot_cpt.py \
         --log-history ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/log_history.json \
         --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
-        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots
+        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots/cpt
 done

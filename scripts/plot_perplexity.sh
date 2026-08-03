@@ -52,4 +52,4 @@ uv run python src/visualisation/plot_perplexity.py \
     --results-dir ${SCRATCH}/cpt-learning-dynamics/results \
     --models "${MODELS[@]}" \
     --language ${LANGUAGE} \
-    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/plots
+    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/plots/perplexity
