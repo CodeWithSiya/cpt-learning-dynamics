@@ -35,7 +35,7 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # All models available for CPT
-ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
 # Language subset to train on
 LANGUAGE="xho"
@@ -53,6 +53,7 @@ declare -A WANDB_RUN_IDS=(
     ["roberta"]="roberta-large-cpt-200k"
     ["xlmr"]="xlmr-large-cpt-200k"
     ["nguni-xlmr"]="nguni-xlmr-large-200k"
+    ["afriberta"]="afriberta-large-cpt-200k"
 )
 
 for model in "${MODELS[@]}"; do

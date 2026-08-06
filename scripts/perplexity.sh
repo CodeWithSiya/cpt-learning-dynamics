@@ -36,7 +36,7 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # All models available for perplexity computation
-ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
 # Language subset to evaluate on
 LANGUAGE="xho_Latn"

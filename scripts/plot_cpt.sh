@@ -32,13 +32,14 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # All models available for CPT loss plotting
-ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
 # Display names used in plot titles
 declare -A MODEL_DISPLAY_NAMES=(
     ["roberta"]="RoBERTa"
     ["xlmr"]="XLMR"
     ["nguni-xlmr"]="Nguni-XLMR"
+    ["afriberta"]="AfriBERTa"
 )
 
 # First script argument selects a single model; if omitted, loop through all models
