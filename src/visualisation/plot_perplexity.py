@@ -27,11 +27,12 @@ LINE_WIDTH = 1.4
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
-    "nguni-xlmr": "Nguni-XLMR"
+    "nguni-xlmr": "Nguni-XLMR",
+    "afriberta": "AfriBERTa"
 }
 
 # Colour palette, one colour per model
-PALETTE = ["lightcoral", "cornflowerblue", "lightgreen"]
+PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
 
 # Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn"]

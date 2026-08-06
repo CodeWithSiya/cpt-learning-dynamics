@@ -1,0 +1,29 @@
+# Model Configuration
+model_name_or_path: "castorini/afriberta_large"
+max_seq_length: 512
+
+# Training Configuration
+learning_rate: 5.0e-5
+per_device_batch_size: 10
+gradient_accumulation_steps: 8
+total_steps: 200000
+warmup_steps: 0
+eval_steps: 2000
+early_stopping_patience: 5
+use_early_stopping: false
+
+# Resumption Configuration
+save_steps: 2000
+save_total_limit: 2
+
+# Checkpointing Configuration
+output_dir: "/home/mdnsiy014/scratch/cpt-learning-dynamics/results/afriberta-large"
+checkpoint_schedule:
+  save_initial_checkpoint: true
+
+# Logging
+logging_steps: 100
+
+# Experiment Tracking
+wandb_project: "cpt-learning-dynamics"
+wandb_run_name: "afriberta-large-cpt-200k"
