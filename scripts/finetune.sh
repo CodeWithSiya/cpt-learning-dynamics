@@ -28,7 +28,8 @@ set +a
 export SCRATCH=/home/mdnsiy014/scratch
 export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
-mkdir -p "${HF_HOME}"
+export DATA_DIR=${SCRATCH}/cpt-learning-dynamics/datasets
+mkdir -p "${HF_HOME}" "${DATA_DIR}"
 
 # Load Python and sync dependencies
 module load python/miniconda3-py3.12
@@ -78,7 +79,7 @@ for model in "${MODELS[@]}"; do
                 --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
                 --task-config configs/evaluation/${task}.yaml \
                 --finetune-config configs/finetuning/${task}.yaml \
-                --preprocessed-dir datasets/processed/evaluation/${model}/${LANGUAGE}/${task} \
+                --preprocessed-dir ${DATA_DIR}/processed/evaluation/${model}/${LANGUAGE}/${task} \
                 --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
                 --seed ${seed}
         done

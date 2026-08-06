@@ -37,7 +37,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="datasets/raw/flores",
+        default=os.path.join(os.environ.get("DATA_DIR", "datasets"), "raw/flores"),
         help="Directory to save the downloaded dataset to disk."
     )
     parser.add_argument(

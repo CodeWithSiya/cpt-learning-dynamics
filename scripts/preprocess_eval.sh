@@ -27,7 +27,8 @@ set +a
 export SCRATCH=/home/mdnsiy014/scratch
 export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
-mkdir -p "${HF_HOME}"
+export DATA_DIR=${SCRATCH}/cpt-learning-dynamics/datasets
+mkdir -p "${HF_HOME}" "${DATA_DIR}"
 
 # Load Python and sync dependencies
 module load python/miniconda3-py3.12
@@ -59,7 +60,7 @@ for model in "${MODELS[@]}"; do
             --model-config configs/models/${model}.yaml \
             --task-config configs/evaluation/${task}.yaml \
             --language ${LANGUAGE} \
-            --output datasets/processed/evaluation/${model}/${LANGUAGE}/${task} \
+            --output ${DATA_DIR}/processed/evaluation/${model}/${LANGUAGE}/${task} \
             --nproc ${SLURM_CPUS_PER_TASK}
     done
 done

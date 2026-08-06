@@ -23,7 +23,8 @@ export UV_LINK_MODE=copy
 export SCRATCH=/home/mdnsiy014/scratch
 export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
-mkdir -p "${HF_HOME}"
+export DATA_DIR=${SCRATCH}/cpt-learning-dynamics/datasets
+mkdir -p "${HF_HOME}" "${DATA_DIR}"
 
 # Load environment variables
 set -a
@@ -54,7 +55,7 @@ for model in "${MODELS[@]}"; do
 
     uv run python src/evaluation/perplexity.py \
         --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
-        --flores-dir datasets/raw/flores \
+        --flores-dir ${DATA_DIR}/raw/flores \
         --language ${LANGUAGE} \
         --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/perplexity/${LANGUAGE}_perplexity.json \
         --batch-size 32
