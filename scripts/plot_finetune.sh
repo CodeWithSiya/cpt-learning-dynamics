@@ -38,7 +38,7 @@ ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
 ALL_TASKS=("ner" "pos" "ntc")
 
 # Seeds available for plotting
-ALL_SEEDS=(42 123)
+ALL_SEEDS=(42 123 456 789 1738)
 
 # Display names used in plot titles
 declare -A MODEL_DISPLAY_NAMES=(
