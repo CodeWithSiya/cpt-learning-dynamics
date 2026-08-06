@@ -27,7 +27,8 @@ set +a
 export SCRATCH=/home/mdnsiy014/scratch
 export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
-mkdir -p "${HF_HOME}"
+export DATA_DIR=${SCRATCH}/cpt-learning-dynamics/datasets
+mkdir -p "${HF_HOME}" "${DATA_DIR}"
 
 # Load Python and sync dependencies
 module load python/miniconda3-py3.12
@@ -53,17 +54,17 @@ for model in "${MODELS[@]}"; do
 
     # Preprocess train split
     uv run python src/data/preprocess_wura.py \
-        --input datasets/raw/corpus/${LANGUAGE} \
+        --input ${DATA_DIR}/raw/corpus/${LANGUAGE} \
         --model-config configs/models/${model}.yaml \
-        --output datasets/processed/corpus/${model}/${LANGUAGE}/train \
+        --output ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/train \
         --split train \
         --nproc ${SLURM_CPUS_PER_TASK}
 
     # Preprocess validation split
     uv run python src/data/preprocess_wura.py \
-        --input datasets/raw/corpus/${LANGUAGE} \
+        --input ${DATA_DIR}/raw/corpus/${LANGUAGE} \
         --model-config configs/models/${model}.yaml \
-        --output datasets/processed/corpus/${model}/${LANGUAGE}/validation \
+        --output ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/validation \
         --split validation \
         --nproc ${SLURM_CPUS_PER_TASK}
 done

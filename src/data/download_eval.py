@@ -83,7 +83,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="datasets/evaluation",
+        default=os.path.join(os.environ.get("DATA_DIR", "datasets"), "raw/evaluation"),
         help="Directory to save evaluation datasets to disk."
     )
     parser.add_argument(

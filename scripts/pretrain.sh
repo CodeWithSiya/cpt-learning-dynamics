@@ -27,7 +27,8 @@ set +a
 export SCRATCH=/home/mdnsiy014/scratch
 export HF_HOME=${SCRATCH}/hf
 export HF_DATASETS_CACHE=${HF_HOME}/datasets
-mkdir -p "${HF_HOME}"
+export DATA_DIR=${SCRATCH}/cpt-learning-dynamics/datasets
+mkdir -p "${HF_HOME}" "${DATA_DIR}"
 
 # Load Python and sync dependencies
 module load python/miniconda3-py3.12
@@ -67,7 +68,7 @@ for model in "${MODELS[@]}"; do
         --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
         src/pretraining/pretrain.py \
         --model-config configs/models/${model}.yaml \
-        --train-corpus datasets/processed/corpus/${model}/${LANGUAGE}/train \
-        --validation-corpus datasets/processed/corpus/${model}/${LANGUAGE}/validation \
+        --train-corpus ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/train \
+        --validation-corpus ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/validation \
         --wandb-run-id "${WANDB_RUN_IDS[$model]}"
 done
