@@ -52,6 +52,13 @@ def parse_args() -> Namespace:
         help="Path to evaluation task YAML config."
     )
     parser.add_argument(
+        "--input",
+        type=str,
+        required=True,
+        help="Directory holding the downloaded task dataset, containing one subdirectory "
+             "per language."
+    )
+    parser.add_argument(
         "--language",
         type=str,
         default="xho",
@@ -252,7 +259,7 @@ def main() -> None:
     hf_logging.set_verbosity_warning()
 
     # Load evaluation dataset from disk
-    dataset_path = Path(task_config.dataset_path) / args.language
+    dataset_path = Path(args.input) / args.language
     logger.info(f"Loading dataset from {dataset_path}...")
     dataset = cast(DatasetDict, load_from_disk(str(dataset_path)))
     logger.info(f"Loaded splits: { {k: len(v) for k, v in dataset.items()} }")

@@ -28,7 +28,6 @@ class TaskConfig:
     Attributes:
         task_name: Short identifier for the task.
         task_type: Type of the downstream task.
-        dataset_path: Local path to the downloaded evaluation dataset.
         input_field: Column name containing the model input.
         label_field: Column name containing the true labels.
         label_names: List of label names corresponding to integer label ids.
@@ -36,7 +35,6 @@ class TaskConfig:
     """
     task_name: str
     task_type: TaskType
-    dataset_path: str
     input_field: str
     label_field: str
     label_names: list[str]
