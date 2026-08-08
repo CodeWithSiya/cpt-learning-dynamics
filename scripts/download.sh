@@ -48,3 +48,8 @@ uv run python src/data/download_eval.py \
 uv run python src/data/download_flores.py \
     --language xho_Latn \
     --output-dir ${DATA_DIR}/raw/flores
+
+# Download FLORES-200 English-isiXhosa parallel dataset
+uv run python src/data/download_flores.py \
+    --language eng_Latn-xho_Latn \
+    --output-dir ${DATA_DIR}/raw/flores
