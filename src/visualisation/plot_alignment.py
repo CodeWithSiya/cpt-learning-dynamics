@@ -100,6 +100,37 @@ def cosine_gap_series(alignment_by_step: dict[int, dict], steps: list[int]) -> n
         dtype=float
     )
 
+def cosine_gap_delta_series(alignment_by_step: dict[int, dict], steps: list[int]) -> np.ndarray:
+    """
+    Convert a per-step cosine gap series to deltas from the step-0 value.
+
+    :param alignment_by_step: Mapping from checkpoint step to alignment results.
+    :param steps: Checkpoint steps to read, in plotting order.
+    :return: Float array of the same length, as deltas from step 0.
+    """
+    values = [alignment_by_step[step].get("cosine_gap") for step in steps]
+    gap = np.array(
+        [np.nan if value is None else float(value) for value in values],
+        dtype=float
+    )
+    baseline = gap[0] if len(gap) > 0 and not np.isnan(gap[0]) else 0.0
+    return gap - baseline
+
+def p_at_1_series(alignment_by_step: dict[int, dict], steps: list[int], key: str) -> np.ndarray:
+    """
+    Convert a per-step P@1 series to a float array.
+
+    :param alignment_by_step: Mapping from checkpoint step to alignment results.
+    :param steps: Checkpoint steps to read, in plotting order.
+    :param key: Which P@1 direction to read (e.g. "p_at_1_target_to_english").
+    :return: Float array of the same length.
+    """
+    values = [alignment_by_step[step].get(key) for step in steps]
+    return np.array(
+        [np.nan if value is None else float(value) for value in values],
+        dtype=float
+    )
+
 def configure_step_axis(ax, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis.
@@ -166,6 +197,64 @@ def plot_model_alignment(alignment_by_model: dict[str, dict[int, dict]], output_
 
     save_figure(fig, output_path, "all-models alignment overview")
 
+def plot_model_cosine_gap_delta(alignment_by_model: dict[str, dict[int, dict]], output_path: Path) -> None:
+    """
+    Plot the change in cosine gap (relative to step 0) for all models on
+    a single figure, removing each model's constant offset.
+
+    :param alignment_by_model: Mapping from model name to alignment results.
+    :param output_path: File path to save the plot image to.
+    """
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+
+    all_steps = []
+
+    # Plot the change in cosine gap for each model
+    for i, (model, alignment_by_step) in enumerate(alignment_by_model.items()):
+        steps = sorted(alignment_by_step.keys())
+        all_steps.extend(steps)
+
+        delta = cosine_gap_delta_series(alignment_by_step, steps)
+        color = PALETTE[i % len(PALETTE)]
+
+        ax.plot(steps, delta, label=MODEL_DISPLAY_NAMES[model], linewidth=LINE_WIDTH, color=color)
+
+    ax.axhline(0, color="gray", linewidth=0.8, linestyle="--")
+    configure_axes(ax, sorted(set(all_steps)), "Change in Cosine Gap")
+    ax.set_ylabel("\u0394 Cosine Gap")
+    ax.legend(loc="best", fontsize=9)
+
+    save_figure(fig, output_path, "all-models cosine gap delta")
+
+def plot_model_p_at_1(alignment_by_model: dict[str, dict[int, dict]], key: str, output_path: Path) -> None:
+    """
+    Plot P@1 retrieval accuracy for all models on a single figure, for one
+    retrieval direction.
+
+    :param alignment_by_model: Mapping from model name to alignment results.
+    :param key: Which P@1 field to read.
+    :param output_path: File path to save the plot image to.
+    """
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
+
+    all_steps = []
+
+    for i, (model, alignment_by_step) in enumerate(alignment_by_model.items()):
+        steps = sorted(alignment_by_step.keys())
+        all_steps.extend(steps)
+
+        p_at_1 = p_at_1_series(alignment_by_step, steps, key)
+        color = PALETTE[i % len(PALETTE)]
+
+        ax.plot(steps, p_at_1, label=MODEL_DISPLAY_NAMES[model], linewidth=LINE_WIDTH, color=color)
+
+    configure_axes(ax, sorted(set(all_steps)), f"Top-1 Retrieval Accuracy")
+    ax.set_ylabel("P@1")
+    ax.set_ylim(0, 1)
+    ax.legend(loc="best", fontsize=9)
+
+    save_figure(fig, output_path, f"all-models P@1")
+
 def main() -> None:
     """Main entry point for plotting cross-lingual alignment dynamics."""
     args = parse_args()
@@ -198,6 +287,17 @@ def main() -> None:
     plot_model_alignment(
         alignment_by_model,
         output_path=output_dir / f"all_models_{args.language}_cosine_gap.png"
+    )
+
+    plot_model_cosine_gap_delta(
+        alignment_by_model,
+        output_path=output_dir / f"all_models_{args.language}_cosine_gap_delta.png"
+    )
+
+    plot_model_p_at_1(
+        alignment_by_model,
+        key="p_at_1_english_to_target",
+        output_path=output_dir / f"all_models_{args.language}_p_at_1_eng2tgt.png"
     )
 
 if __name__ == "__main__":
