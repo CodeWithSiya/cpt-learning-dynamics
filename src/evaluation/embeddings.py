@@ -1,5 +1,5 @@
 """
-Helpers for extracting static (non-contextual) embedding-layer representations from a model.
+Helpers for extracting the (contextual) final hidden state representations from a model.
 
 Based on Conneau et al. (2020) for analysing the static embedding layer, and 
 Reimers and Gurevych (2019) for mean pooling token representations.
@@ -44,16 +44,15 @@ def load_flores_pairs(flores_pairs_dir: Path, language: str) -> tuple[list[str],
 def embed_sentences(sentences: list[str], model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase,
                     device: torch.device, batch_size: int = DEFAULT_BATCH_SIZE) -> np.ndarray:
     """
-    Compute mean-pooled static embeddings for a list of sentences, in batches.
+    Compute mean-pooled final-layer (contextualised) embeddings for a list of sentences, in batches.
 
     :param sentences: List of raw sentence texts.
-    :param model: Model to extract the embedding layer from.
+    :param model: Model to run the forward pass through.
     :param tokenizer: Tokenizer matching the model.
     :param device: Device to run the embedding lookup on.
     :param batch_size: Number of sentences to embed per batch.
     :return: Array of shape (N, D), one mean-pooled embedding per sentence.
     """
-    embedding_layer = model.get_input_embeddings()
     batch_embeddings = []
 
     for start in range(0, len(sentences), batch_size):
@@ -80,9 +79,10 @@ def embed_sentences(sentences: list[str], model: PreTrainedModel, tokenizer: Pre
         if empty_rows.any():
             content_mask[empty_rows] = attention_mask[empty_rows]
 
-        # Extract the token embeddings from the embedding layer
+        # Extract the token embeddings from the final hidden state
         with torch.no_grad():
-            token_embeddings = embedding_layer(input_ids)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            token_embeddings = outputs.last_hidden_state
 
         # Compute the masked mean across token embeddings
         mask = content_mask.unsqueeze(-1).to(token_embeddings.dtype)
