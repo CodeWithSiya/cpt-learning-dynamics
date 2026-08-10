@@ -106,8 +106,8 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
                             model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, device: torch.device,
                             batch_size: int) -> dict:
     """
-    Compute the cosine gap between aligned translation pairs and baseline similarity
-    score, for a single checkpoint.
+    Compute the cosine gap and top-1 retrieval accuracy (P@1) between
+    aligned translation pairs and a baseline, for a single checkpoint.
 
     :param english_sentences: List of English sentences.
     :param target_sentences: List of parallel target-language sentences.
@@ -132,10 +132,19 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
     baseline_scores = similarity_matrix[~np.eye(n, dtype=bool)]
     baseline_mean = float(np.mean(baseline_scores))
 
+    # Compute top-1 retrieval accuracy (P@1) in both directions
+    target_to_english_predictions = similarity_matrix.argmax(axis=1)
+    p_at_1_target_to_english = float(np.mean(target_to_english_predictions == np.arange(n)))
+
+    english_to_target_predictions = similarity_matrix.argmax(axis=0)
+    p_at_1_english_to_target = float(np.mean(english_to_target_predictions == np.arange(n)))
+
     return {
         "matched_cosine_similarity": matched_mean,
         "baseline_cosine_similarity": baseline_mean,
         "cosine_gap": matched_mean - baseline_mean,
+        "p_at_1_target_to_english": p_at_1_target_to_english,
+        "p_at_1_english_to_target": p_at_1_english_to_target,
     }
 
 def main():
