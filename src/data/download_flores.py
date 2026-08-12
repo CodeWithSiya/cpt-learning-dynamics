@@ -30,10 +30,10 @@ DATASET_NAME = "facebook/flores"
 SPLIT = "devtest"
 
 # Single-language configurations (for pseudo-perplexity)
-SUPPORTED_LANGUAGES = ["xho_Latn"]
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 # English-paired configs (for cross-lingual alignment)
-SUPPORTED_LANGUAGE_PAIRS = ["eng_Latn-xho_Latn"]
+SUPPORTED_LANGUAGE_PAIRS = ["eng_Latn-xho_Latn", "eng_Latn-zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""

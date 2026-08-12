@@ -35,7 +35,7 @@ MODEL_DISPLAY_NAMES = {
 PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
 
 # Supported languages
-SUPPORTED_LANGUAGES = ["xho_Latn"]
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -263,11 +263,13 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    language = args.language.split("_")[0]
+
     # Load the alignment results for every model that has been evaluated
     alignment_by_model = {}
 
     for model in args.models:
-        alignment_path = results_dir / f"{model}-large" / "alignment" / f"{args.language}_alignment.json"
+        alignment_path = results_dir / f"{model}-large" / language / "alignment" / f"{args.language}_alignment.json"
 
         if not alignment_path.exists():
             logger.warning(f"No alignment results for '{model}' in {results_dir}, skipping.")

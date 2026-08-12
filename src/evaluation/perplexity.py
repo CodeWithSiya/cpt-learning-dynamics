@@ -34,7 +34,7 @@ DEVICE = torch.device("cuda" if IS_GPU_AVAILABLE else "cpu")
 MAX_SEQ_LENGTH = 512
 
 # Supported languages, matching the subsets saved by download_flores.py
-SUPPORTED_LANGUAGES = ["xho_Latn"]
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""

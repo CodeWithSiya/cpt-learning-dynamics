@@ -5,6 +5,7 @@ Datasets:
     - https://huggingface.co/datasets/masakhane/masakhaner2
     - https://huggingface.co/datasets/masakhane/masakhapos
     - https://huggingface.co/datasets/masakhane/masakhanews
+    - https://github.com/uds-lsv/afro-maft/tree/main/dataset/ANTC
 """
 
 import argparse
@@ -31,35 +32,54 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EvalTaskConfig:
     """Configuration for a single evaluation task dataset."""
-    dataset_name: str
+    dataset_name: Optional[str]
     trust_remote_code: bool
     splits: list[str]
+    languages: list[str]
     description: str
+    tsv_url: Optional[str] = None
+
+# ANTC is distributed as TSV files on GitHub rather than as a HuggingFace dataset
+ANTC_URL = "https://raw.githubusercontent.com/uds-lsv/afro-maft/main/dataset/ANTC/{language}/{file}.tsv"
+
+# Remote ANTC split filenames differ from the canonical split names used downstream
+ANTC_SPLIT_FILES = {"train": "train", "validation": "dev", "test": "test"}
 
 # Evaluation tasks and datasets
 EVAL_TASKS = {
     "ner": EvalTaskConfig(
         dataset_name="masakhane/masakhaner2",
-        trust_remote_code=True, 
+        trust_remote_code=True,
         splits=["train", "validation", "test"],
+        languages=["xho", "zul"],
         description="MasakhaNER 2.0: Named Entity Recognition"
     ),
     "pos": EvalTaskConfig(
         dataset_name="masakhane/masakhapos",
-        trust_remote_code=True,  
+        trust_remote_code=True,
         splits=["train", "validation", "test"],
+        languages=["xho", "zul"],
         description="MasakhaPOS: Part-of-Speech Tagging"
     ),
-    "ntc": EvalTaskConfig(
+    "ntc_xho": EvalTaskConfig(
         dataset_name="masakhane/masakhanews",
         trust_remote_code=False,
         splits=["train", "validation", "test"],
+        languages=["xho"],
         description="MasakhaNEWS: News Topic Classification"
+    ),
+    "ntc_zul": EvalTaskConfig(
+        dataset_name=None,
+        trust_remote_code=False,
+        splits=["train", "validation", "test"],
+        languages=["zul"],
+        description="ANTC: African News Topic Classification",
+        tsv_url=ANTC_URL
     ),
 }
 
 # Supported languages
-SUPPORTED_LANGUAGES = ["xho"]
+SUPPORTED_LANGUAGES = ["xho", "zul"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -105,6 +125,22 @@ def load_eval_dataset(task_name: str, config: EvalTaskConfig, language: str, cac
     :return: DatasetDict with train, validation and test splits.
     """
     logger.info(f"Loading {config.description} ({language})...")
+
+    # ANTC is not hosted on HuggingFace, so read its TSV files directly. Categories are left
+    # as strings, so preprocessing maps them to label IDs via the task config.
+    if config.tsv_url is not None:
+        return cast(DatasetDict, load_dataset(
+            path="csv",
+            data_files={
+                split: config.tsv_url.format(language=language, file=file)
+                for split, file in ANTC_SPLIT_FILES.items()
+            },
+            delimiter="\t",
+            cache_dir=cache_dir
+        ))
+
+    if config.dataset_name is None:
+        raise ValueError(f"[{task_name}] has neither a HuggingFace dataset name nor a TSV URL")
 
     # Try to get HF token
     token = get_token()
@@ -164,6 +200,15 @@ def main() -> None:
 
     for task_name in args.tasks:
         config = EVAL_TASKS[task_name]
+
+        # Task coverage is uneven: MasakhaNEWS has no isiZulu, ANTC has no isiXhosa
+        if args.language not in config.languages:
+            logger.info(
+                f"[{task_name}] skipping: no {args.language} subset "
+                f"(available: {config.languages})"
+            )
+            continue
+
         dataset = load_eval_dataset(
             task_name=task_name,
             config=config,
