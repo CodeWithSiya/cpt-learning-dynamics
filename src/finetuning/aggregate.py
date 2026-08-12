@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 TASK_METRICS = {
     "ner": "f1",
     "pos": "f1",
-    "ntc": "f1"
+    "ntc_xho": "f1",
+    "ntc_zul": "f1"
 }
 
 def parse_args() -> Namespace:

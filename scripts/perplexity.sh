@@ -39,8 +39,14 @@ uv sync --frozen
 # All models available for perplexity computation
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# Language subset to evaluate on
-LANGUAGE="xho_Latn"
+# All language subsets to evaluate on
+ALL_LANGUAGES=("xho" "zul")
+
+# FLORES-200 language codes
+declare -A FLORES_CODES=(
+    ["xho"]="xho_Latn"
+    ["zul"]="zul_Latn"
+)
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -50,13 +56,24 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-for model in "${MODELS[@]}"; do
-    echo "=== Computing pseudo-perplexity for ${model} ==="
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
 
-    uv run python src/evaluation/perplexity.py \
-        --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
-        --flores-dir ${DATA_DIR}/raw/flores \
-        --language ${LANGUAGE} \
-        --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/perplexity/${LANGUAGE}_perplexity.json \
-        --batch-size 32
+for model in "${MODELS[@]}"; do
+    for language in "${LANGUAGES[@]}"; do
+        flores_code="${FLORES_CODES[$language]}"
+        echo "=== Computing pseudo-perplexity for ${model} (${language}) ==="
+
+        uv run python src/evaluation/perplexity.py \
+            --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
+            --flores-dir ${DATA_DIR}/raw/flores \
+            --language ${flores_code} \
+            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/perplexity/${flores_code}_perplexity.json \
+            --batch-size 32
+    done
 done

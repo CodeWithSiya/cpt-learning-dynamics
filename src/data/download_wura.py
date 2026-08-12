@@ -26,7 +26,7 @@ load_dotenv()
 
 # WURA dataset constants
 DATASET_NAME = "castorini/wura"
-SUPPORTED_LANGUAGES = ["xho"]
+SUPPORTED_LANGUAGES = ["xho", "zul"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""

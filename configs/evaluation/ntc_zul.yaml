@@ -1,0 +1,18 @@
+# Task Configuration
+task_name: "ntc_zul"
+task_type: "sequence_classification"
+
+# Dataset Fields
+input_field: "text"
+label_field: "label"
+
+# Label Configuration
+label_names:
+  - "Ezemidlalo"       # Sports
+  - "Ezezimoto"        # Motoring
+  - "Ezokungcebeleka"  # Entertainment
+  - "Imibono"          # Opinion
+  - "Intandokazi"      # Lifestyle
+
+# Evaluation Configuration
+metric: "sequence"

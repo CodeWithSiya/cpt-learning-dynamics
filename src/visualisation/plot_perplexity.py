@@ -35,7 +35,7 @@ MODEL_DISPLAY_NAMES = {
 PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
 
 # Supported languages
-SUPPORTED_LANGUAGES = ["xho_Latn"]
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -194,11 +194,14 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Results are stored under the ISO 639-3 code of the CPT language
+    language = args.language.split("_")[0]
+
     # Load the perplexity results for every model that has been evaluated
     perplexity_by_model = {}
 
     for model in args.models:
-        perplexity_path = results_dir / f"{model}-large" / "perplexity" / f"{args.language}_perplexity.json"
+        perplexity_path = results_dir / f"{model}-large" / language / "perplexity" / f"{args.language}_perplexity.json"
 
         if not perplexity_path.exists():
             logger.warning(f"No perplexity results for '{model}' in {results_dir}, skipping.")
@@ -220,7 +223,7 @@ def main() -> None:
         filename = model_name.lower().replace(" ", "_").replace("-", "_")
 
         # Save each model's plot alongside its other plots
-        model_plots_dir = results_dir / f"{model}-large" / "plots"
+        model_plots_dir = results_dir / f"{model}-large" / language / "plots"
         model_plots_dir.mkdir(parents=True, exist_ok=True)
 
         plot_perplexity_dynamics(

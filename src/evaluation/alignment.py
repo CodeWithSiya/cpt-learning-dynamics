@@ -38,8 +38,8 @@ logger = logging.getLogger(__name__)
 IS_GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if IS_GPU_AVAILABLE else "cpu")
 
-# Supported target languages, matching the paired subsets saved by download_flores.py
-SUPPORTED_LANGUAGES = ["xho_Latn"]
+# Supported target languages
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""

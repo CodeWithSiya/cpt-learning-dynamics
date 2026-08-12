@@ -39,14 +39,17 @@ uv sync --frozen
 # All models available for fine-tuning
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# All evaluation tasks
-ALL_TASKS=("ner" "pos" "ntc")
+# All language subsets being evaluated
+ALL_LANGUAGES=("xho" "zul")
+
+# Evaluation tasks available for each language
+declare -A LANGUAGE_TASKS=(
+    ["xho"]="ner pos ntc_xho"
+    ["zul"]="ner pos ntc_zul"
+)
 
 # All random seeds for variance estimation
 ALL_SEEDS=(42 123 456 789 1738)
-
-# Language subset being evaluated
-LANGUAGE="xho"
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -56,8 +59,16 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-# Second script argument selects a single seed; if omitted, loop through all seeds
-SEED_ARG="$2"
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
+
+# Third script argument selects a single seed; if omitted, loop through all seeds
+SEED_ARG="$3"
 if [ -n "${SEED_ARG}" ]; then
     SEEDS=("${SEED_ARG}")
 else
@@ -65,23 +76,25 @@ else
 fi
 
 for model in "${MODELS[@]}"; do
-    for task in "${ALL_TASKS[@]}"; do
-        for seed in "${SEEDS[@]}"; do
-            echo "=== Fine-tuning and evaluating ${model} on ${task}, seed ${seed} ==="
+    for language in "${LANGUAGES[@]}"; do
+        for task in ${LANGUAGE_TASKS[$language]}; do
+            for seed in "${SEEDS[@]}"; do
+                echo "=== Fine-tuning and evaluating ${model} on ${task} (${language}), seed ${seed} ==="
 
-            uv run accelerate launch \
-                --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-                --num_machines 1 \
-                --dynamo_backend no \
-                --mixed_precision bf16 \
-                --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-                src/finetuning/finetune.py \
-                --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/checkpoints \
-                --task-config configs/evaluation/${task}.yaml \
-                --finetune-config configs/finetuning/${task}.yaml \
-                --preprocessed-dir ${DATA_DIR}/processed/evaluation/${model}/${LANGUAGE}/${task} \
-                --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
-                --seed ${seed}
+                uv run accelerate launch \
+                    --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+                    --num_machines 1 \
+                    --dynamo_backend no \
+                    --mixed_precision bf16 \
+                    --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
+                    src/finetuning/finetune.py \
+                    --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
+                    --task-config configs/evaluation/${task}.yaml \
+                    --finetune-config configs/finetuning/${task}.yaml \
+                    --preprocessed-dir ${DATA_DIR}/processed/evaluation/${model}/${language}/${task} \
+                    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
+                    --seed ${seed}
+            done
         done
     done
 done

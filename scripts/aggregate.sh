@@ -34,8 +34,14 @@ uv sync --frozen
 # All models available for aggregation
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# All evaluation tasks
-ALL_TASKS=("ner" "pos" "ntc")
+# All language subsets to aggregate
+ALL_LANGUAGES=("xho" "zul")
+
+# Evaluation tasks available for each language
+declare -A LANGUAGE_TASKS=(
+    ["xho"]="ner pos ntc_xho"
+    ["zul"]="ner pos ntc_zul"
+)
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -45,13 +51,23 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-for model in "${MODELS[@]}"; do
-    for task in "${ALL_TASKS[@]}"; do
-        echo "=== Aggregating ${task} results for ${model} across seeds ==="
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
 
-        uv run python src/finetuning/aggregate.py \
-            --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
-            --task ${task} \
-            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated/${task}_aggregated.json
+for model in "${MODELS[@]}"; do
+    for language in "${LANGUAGES[@]}"; do
+        for task in ${LANGUAGE_TASKS[$language]}; do
+            echo "=== Aggregating ${task} (${language}) results for ${model} across seeds ==="
+
+            uv run python src/finetuning/aggregate.py \
+                --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
+                --task ${task} \
+                --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/aggregated/${task}_aggregated.json
+        done
     done
 done

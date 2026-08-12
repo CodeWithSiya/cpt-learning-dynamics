@@ -34,8 +34,8 @@ uv sync --frozen
 # All models available for plotting
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# Language subset to plot
-LANGUAGE="xho_Latn"
+# All language subsets to plot
+ALL_LANGUAGES=("xho_Latn" "zul_Latn")
 
 # First script argument selects a single model; if omitted, plot all models
 MODEL_ARG="$1"
@@ -45,11 +45,21 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-# Plot cross-lingual alignment dynamics
-echo "=== Plotting cross-lingual alignment dynamics for ${MODELS[@]} ==="
+# Second script argument selects a single language; if omitted, plot all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
 
-uv run python src/visualisation/plot_alignment.py \
-    --results-dir ${SCRATCH}/cpt-learning-dynamics/results \
-    --models "${MODELS[@]}" \
-    --language ${LANGUAGE} \
-    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/plots/alignment
+# Plot cross-lingual alignment dynamics
+for language in "${LANGUAGES[@]}"; do
+    echo "=== Plotting cross-lingual alignment dynamics for ${MODELS[@]} (${language}) ==="
+
+    uv run python src/visualisation/plot_alignment.py \
+        --results-dir ${SCRATCH}/cpt-learning-dynamics/results \
+        --models "${MODELS[@]}" \
+        --language ${language} \
+        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/plots/alignment
+done

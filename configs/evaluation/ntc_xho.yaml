@@ -1,5 +1,5 @@
 # Task Configuration
-task_name: "ntc"
+task_name: "ntc_xho"
 task_type: "sequence_classification"
 
 # Dataset Fields

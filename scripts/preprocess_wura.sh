@@ -38,8 +38,8 @@ uv sync --frozen
 # All models available for preprocessing
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# Language subset to preprocess
-LANGUAGE="xho"
+# All language subsets to preprocess
+ALL_LANGUAGES=("xho" "zul")
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -49,22 +49,32 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
+
 for model in "${MODELS[@]}"; do
-    echo "=== Preprocessing corpus for model: ${model} ==="
+    for language in "${LANGUAGES[@]}"; do
+        echo "=== Preprocessing corpus for model: ${model} (${language}) ==="
 
-    # Preprocess train split
-    uv run python src/data/preprocess_wura.py \
-        --input ${DATA_DIR}/raw/corpus/${LANGUAGE} \
-        --model-config configs/models/${model}.yaml \
-        --output ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/train \
-        --split train \
-        --nproc ${SLURM_CPUS_PER_TASK}
+        # Preprocess train split
+        uv run python src/data/preprocess_wura.py \
+            --input ${DATA_DIR}/raw/corpus/${language} \
+            --model-config configs/models/${model}.yaml \
+            --output ${DATA_DIR}/processed/corpus/${model}/${language}/train \
+            --split train \
+            --nproc ${SLURM_CPUS_PER_TASK}
 
-    # Preprocess validation split
-    uv run python src/data/preprocess_wura.py \
-        --input ${DATA_DIR}/raw/corpus/${LANGUAGE} \
-        --model-config configs/models/${model}.yaml \
-        --output ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/validation \
-        --split validation \
-        --nproc ${SLURM_CPUS_PER_TASK}
+        # Preprocess validation split
+        uv run python src/data/preprocess_wura.py \
+            --input ${DATA_DIR}/raw/corpus/${language} \
+            --model-config configs/models/${model}.yaml \
+            --output ${DATA_DIR}/processed/corpus/${model}/${language}/validation \
+            --split validation \
+            --nproc ${SLURM_CPUS_PER_TASK}
+    done
 done
