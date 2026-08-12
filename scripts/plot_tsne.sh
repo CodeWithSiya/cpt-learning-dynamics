@@ -1,0 +1,88 @@
+#!/bin/bash
+
+#SBATCH --account=l40sfree
+#SBATCH --partition=l40s
+#SBATCH --nodes=1 --ntasks=1
+#SBATCH --gres=gpu:l40s:1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=02:00:00
+#SBATCH --job-name="cpt-plot-tsne"
+#SBATCH --mail-user=mdnsiy014@myuct.ac.za
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --output=logs/plot_tsne_%j.log
+#SBATCH --error=logs/plot_tsne_%j.log
+
+# Update to latest commit
+git pull
+git log -1
+
+# Suppress uv hardlink warning
+export UV_LINK_MODE=copy
+
+# HPC paths
+export SCRATCH=/home/mdnsiy014/scratch
+export HF_HOME=${SCRATCH}/hf
+export HF_DATASETS_CACHE=${HF_HOME}/datasets
+export DATA_DIR=${SCRATCH}/cpt-learning-dynamics/datasets
+mkdir -p "${HF_HOME}" "${DATA_DIR}"
+
+# Load environment variables
+set -a
+source /home/mdnsiy014/cpt-learning-dynamics/.env
+set +a
+
+# Load Python and sync dependencies
+module load python/miniconda3-py3.12
+cd /home/mdnsiy014/cpt-learning-dynamics
+uv sync --frozen
+
+# All models available for plotting
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
+
+# All language subsets to plot
+ALL_LANGUAGES=("xho" "zul")
+
+# FLORES-200 language codes
+declare -A FLORES_CODES=(
+    ["xho"]="xho_Latn"
+    ["zul"]="zul_Latn"
+)
+
+# Display names used in plot titles
+declare -A MODEL_DISPLAY_NAMES=(
+    ["roberta"]="RoBERTa"
+    ["xlmr"]="XLMR"
+    ["nguni-xlmr"]="Nguni-XLMR"
+    ["afriberta"]="AfriBERTa"
+)
+
+# First script argument selects a single model; if omitted, loop through all models
+MODEL_ARG="$1"
+if [ -n "${MODEL_ARG}" ]; then
+    MODELS=("${MODEL_ARG}")
+else
+    MODELS=("${ALL_MODELS[@]}")
+fi
+
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
+
+for model in "${MODELS[@]}"; do
+    for language in "${LANGUAGES[@]}"; do
+        flores_code="${FLORES_CODES[$language]}"
+        echo "=== Plotting t-SNE grid for ${model} (${language}) ==="
+
+        uv run python src/visualisation/plot_tsne.py \
+            --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
+            --flores-dir ${DATA_DIR}/raw/flores \
+            --language ${flores_code} \
+            --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
+            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/plots/tsne \
+            --batch-size 64
+    done
+done
