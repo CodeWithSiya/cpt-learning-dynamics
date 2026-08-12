@@ -19,6 +19,7 @@ dependencies = [
     "huggingface-hub>=0.23.0",
     "sentencepiece>=0.2.2",
     "tiktoken>=0.13.0",
+    "isoscore>=2.0.1",
 ]
 
 [tool.uv.sources]
