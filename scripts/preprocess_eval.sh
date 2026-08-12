@@ -38,11 +38,14 @@ uv sync --frozen
 # All models available for preprocessing
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# All evaluation tasks
-ALL_TASKS=("ner" "pos" "ntc")
+# All language subsets to preprocess
+ALL_LANGUAGES=("xho" "zul")
 
-# Language subset to preprocess
-LANGUAGE="xho"
+# Evaluation tasks available for each language
+declare -A LANGUAGE_TASKS=(
+    ["xho"]="ner pos ntc_xho"
+    ["zul"]="ner pos ntc_zul"
+)
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -52,16 +55,26 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-for model in "${MODELS[@]}"; do
-    for task in "${ALL_TASKS[@]}"; do
-        echo "=== Preprocessing ${task} eval dataset for model: ${model} ==="
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
 
-        uv run python src/data/preprocess_eval.py \
-            --model-config configs/models/${model}.yaml \
-            --task-config configs/evaluation/${task}.yaml \
-            --input ${DATA_DIR}/raw/evaluation/${task} \
-            --language ${LANGUAGE} \
-            --output ${DATA_DIR}/processed/evaluation/${model}/${LANGUAGE}/${task} \
-            --nproc ${SLURM_CPUS_PER_TASK}
+for model in "${MODELS[@]}"; do
+    for language in "${LANGUAGES[@]}"; do
+        for task in ${LANGUAGE_TASKS[$language]}; do
+            echo "=== Preprocessing ${task} eval dataset for model: ${model} (${language}) ==="
+
+            uv run python src/data/preprocess_eval.py \
+                --model-config configs/models/${model}.yaml \
+                --task-config configs/evaluation/${task}.yaml \
+                --input ${DATA_DIR}/raw/evaluation/${task} \
+                --language ${language} \
+                --output ${DATA_DIR}/processed/evaluation/${model}/${language}/${task} \
+                --nproc ${SLURM_CPUS_PER_TASK}
+        done
     done
 done

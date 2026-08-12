@@ -39,9 +39,19 @@ uv run python src/data/download_wura.py \
     --language xho \
     --output-dir ${DATA_DIR}/raw/corpus
 
-# Download all evaluation datasets
+# Download WURA isiZulu corpus
+uv run python src/data/download_wura.py \
+    --language zul \
+    --output-dir ${DATA_DIR}/raw/corpus
+
+# Download all isiXhosa evaluation datasets
 uv run python src/data/download_eval.py \
     --language xho \
+    --output-dir ${DATA_DIR}/raw/evaluation
+
+# Download all isiZulu evaluation datasets
+uv run python src/data/download_eval.py \
+    --language zul \
     --output-dir ${DATA_DIR}/raw/evaluation
 
 # Download FLORES-200 isiXhosa dataset
@@ -49,7 +59,17 @@ uv run python src/data/download_flores.py \
     --language xho_Latn \
     --output-dir ${DATA_DIR}/raw/flores
 
+# Download FLORES-200 isiZulu dataset
+uv run python src/data/download_flores.py \
+    --language zul_Latn \
+    --output-dir ${DATA_DIR}/raw/flores
+
 # Download FLORES-200 English-isiXhosa parallel dataset
 uv run python src/data/download_flores.py \
     --language eng_Latn-xho_Latn \
+    --output-dir ${DATA_DIR}/raw/flores
+
+# Download FLORES-200 English-isiZulu parallel dataset
+uv run python src/data/download_flores.py \
+    --language eng_Latn-zul_Latn \
     --output-dir ${DATA_DIR}/raw/flores

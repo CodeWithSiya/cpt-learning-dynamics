@@ -38,8 +38,8 @@ uv sync --frozen
 # All models available for CPT
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# Language subset to train on
-LANGUAGE="xho"
+# All language subsets to train on
+ALL_LANGUAGES=("xho" "zul")
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -49,7 +49,15 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-# W&B run IDs per model, so resubmitted jobs resume the same run
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
+
+# W&B run ID prefixes per model, suffixed with the language below, so resubmitted jobs resume the same run
 declare -A WANDB_RUN_IDS=(
     ["roberta"]="roberta-large-cpt-200k"
     ["xlmr"]="xlmr-large-cpt-200k"
@@ -58,17 +66,20 @@ declare -A WANDB_RUN_IDS=(
 )
 
 for model in "${MODELS[@]}"; do
-    echo "=== Running CPT for model: ${model} ==="
+    for language in "${LANGUAGES[@]}"; do
+        echo "=== Running CPT for model: ${model} (${language}) ==="
 
-    uv run accelerate launch \
-        --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-        --num_machines 1 \
-        --dynamo_backend no \
-        --mixed_precision bf16 \
-        --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-        src/pretraining/pretrain.py \
-        --model-config configs/models/${model}.yaml \
-        --train-corpus ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/train \
-        --validation-corpus ${DATA_DIR}/processed/corpus/${model}/${LANGUAGE}/validation \
-        --wandb-run-id "${WANDB_RUN_IDS[$model]}"
+        uv run accelerate launch \
+            --num_processes ${SLURM_GPUS_ON_NODE:-1} \
+            --num_machines 1 \
+            --dynamo_backend no \
+            --mixed_precision bf16 \
+            --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
+            src/pretraining/pretrain.py \
+            --model-config configs/models/${model}.yaml \
+            --train-corpus ${DATA_DIR}/processed/corpus/${model}/${language}/train \
+            --validation-corpus ${DATA_DIR}/processed/corpus/${model}/${language}/validation \
+            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language} \
+            --wandb-run-id "${WANDB_RUN_IDS[$model]}-${language}"
+    done
 done
