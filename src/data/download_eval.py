@@ -41,7 +41,6 @@ class EvalTaskConfig:
     description: str
     tsv_url: Optional[str] = None
 
-# ANTC is distributed as TSV files on GitHub rather than as a HuggingFace dataset
 ANTC_URL = "https://raw.githubusercontent.com/uds-lsv/afro-maft/main/dataset/ANTC/{language}/{file}.tsv"
 
 # Remote ANTC split filenames differ from the canonical split names used downstream
@@ -149,10 +148,6 @@ def fetch_with_retries(url: str, task_name: str) -> bytes:
 def download_tsv_splits(task_name: str, config: EvalTaskConfig, language: str, output_dir: str) -> dict[str, str]:
     """
     Download a task's remote TSV splits to disk, one file per split.
-
-    Fetched with requests rather than letting datasets stream the URLs, as the
-    fsspec HTTP backend ignores the http_proxy environment variables that HPC
-    compute nodes need to reach hosts outside the university network.
 
     :param task_name: Name of the evaluation task.
     :param config: EvalTaskConfig for this task, with a tsv_url template.

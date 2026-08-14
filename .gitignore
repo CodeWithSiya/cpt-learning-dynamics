@@ -231,3 +231,6 @@ logs
 
 # Weights and Biases cache
 wandb
+
+# Local Scripts
+download_plots.sh
