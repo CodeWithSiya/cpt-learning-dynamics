@@ -1,6 +1,5 @@
 """
-Compute cross-lingual alignment across CPT checkpoints using FLORES-200, 
-following Idris et al. (2026).
+Compute cross-lingual alignment across CPT checkpoints using FLORES-200.
 """
 
 import argparse
@@ -144,11 +143,11 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
     baseline_mean = float(np.mean(baseline_scores))
 
     # Compute top-1 retrieval accuracy (P@1) in both directions
-    target_to_english_predictions = similarity_matrix.argmax(axis=1)
-    p_at_1_target_to_english = float(np.mean(target_to_english_predictions == np.arange(n)))
-
-    english_to_target_predictions = similarity_matrix.argmax(axis=0)
+    english_to_target_predictions = similarity_matrix.argmax(axis=1)
     p_at_1_english_to_target = float(np.mean(english_to_target_predictions == np.arange(n)))
+
+    target_to_english_predictions = similarity_matrix.argmax(axis=0)
+    p_at_1_target_to_english = float(np.mean(target_to_english_predictions == np.arange(n)))
 
     # Compute the isotropy of the shared bilingual representation space
     iso_score_shared = compute_iso_score(
@@ -159,8 +158,8 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
         "matched_cosine_similarity": matched_mean,
         "baseline_cosine_similarity": baseline_mean,
         "cosine_gap": matched_mean - baseline_mean,
-        "p_at_1_target_to_english": p_at_1_target_to_english,
         "p_at_1_english_to_target": p_at_1_english_to_target,
+        "p_at_1_target_to_english": p_at_1_target_to_english,
         "iso_score_shared": iso_score_shared
     }
 
