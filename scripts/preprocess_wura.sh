@@ -1,15 +1,15 @@
 #!/bin/bash
 
-#SBATCH --account=l40sfree
-#SBATCH --partition=l40s
-#SBATCH --nodes=1 --ntasks=1 --gres=gpu:l40s:1
-#SBATCH --cpus-per-task=4
+#SBATCH --account=compsci
+#SBATCH --partition=ada
+#SBATCH --nodes=1 --ntasks=1
+#SBATCH --cpus-per-task=8
 #SBATCH --time=47:59:00
-#SBATCH --job-name="cpt-pretrain"
+#SBATCH --job-name="cpt-preprocess-corpus"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/pretrain_%j.log
-#SBATCH --error=logs/pretrain_%j.log
+#SBATCH --output=logs/preprocess_wura_%j.log
+#SBATCH --error=logs/preprocess_wura_%j.log
 
 # Update to latest commit
 git pull
@@ -35,10 +35,10 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# All models available for CPT
+# All models available for preprocessing
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# All language subsets to train on
+# All language subsets to preprocess
 ALL_LANGUAGES=("xho" "zul")
 
 # First script argument selects a single model; if omitted, loop through all models
@@ -57,29 +57,24 @@ else
     LANGUAGES=("${ALL_LANGUAGES[@]}")
 fi
 
-# W&B run ID prefixes per model, suffixed with the language below, so resubmitted jobs resume the same run
-declare -A WANDB_RUN_IDS=(
-    ["roberta"]="roberta-large-cpt-200k"
-    ["xlmr"]="xlmr-large-cpt-200k"
-    ["nguni-xlmr"]="nguni-xlmr-large-200k"
-    ["afriberta"]="afriberta-large-cpt-200k"
-)
-
 for model in "${MODELS[@]}"; do
     for language in "${LANGUAGES[@]}"; do
-        echo "=== Running CPT for model: ${model} (${language}) ==="
+        echo "=== Preprocessing corpus for model: ${model} (${language}) ==="
 
-        uv run accelerate launch \
-            --num_processes ${SLURM_GPUS_ON_NODE:-1} \
-            --num_machines 1 \
-            --dynamo_backend no \
-            --mixed_precision bf16 \
-            --main_process_port $((29500 + SLURM_JOB_ID % 1000)) \
-            src/pretraining/pretrain.py \
+        # Preprocess train split
+        uv run python src/data/preprocess_wura.py \
+            --input ${DATA_DIR}/raw/corpus/${language} \
             --model-config configs/models/${model}.yaml \
-            --train-corpus ${DATA_DIR}/processed/corpus/${model}/${language}/train \
-            --validation-corpus ${DATA_DIR}/processed/corpus/${model}/${language}/validation \
-            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language} \
-            --wandb-run-id "${WANDB_RUN_IDS[$model]}-${language}"
+            --output ${DATA_DIR}/processed/corpus/${model}/${language}/train \
+            --split train \
+            --nproc ${SLURM_CPUS_PER_TASK}
+
+        # Preprocess validation split
+        uv run python src/data/preprocess_wura.py \
+            --input ${DATA_DIR}/raw/corpus/${language} \
+            --model-config configs/models/${model}.yaml \
+            --output ${DATA_DIR}/processed/corpus/${model}/${language}/validation \
+            --split validation \
+            --nproc ${SLURM_CPUS_PER_TASK}
     done
 done

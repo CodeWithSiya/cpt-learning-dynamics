@@ -32,16 +32,23 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # All models available for plotting
-ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# All evaluation tasks
-ALL_TASKS=("ner" "pos" "ntc")
+# All language subsets available for plotting
+ALL_LANGUAGES=("xho" "zul")
+
+# Evaluation tasks available for each language
+declare -A LANGUAGE_TASKS=(
+    ["xho"]="ner pos ntc_xho"
+    ["zul"]="ner pos ntc_zul"
+)
 
 # Display names used in plot titles
 declare -A MODEL_DISPLAY_NAMES=(
     ["roberta"]="RoBERTa"
     ["xlmr"]="XLMR"
     ["nguni-xlmr"]="Nguni-XLMR"
+    ["afriberta"]="AfriBERTa"
 )
 
 # First script argument selects a single model; if omitted, loop through all models
@@ -52,22 +59,32 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
+
 for model in "${MODELS[@]}"; do
-    # Aggregate results across seeds, one file per task
-    for task in "${ALL_TASKS[@]}"; do
-        echo "=== Aggregating ${task} results for ${model} ==="
+    for language in "${LANGUAGES[@]}"; do
+        # Aggregate results across seeds, one file per task
+        for task in ${LANGUAGE_TASKS[$language]}; do
+            echo "=== Aggregating ${task} (${language}) results for ${model} ==="
 
-        uv run python src/finetuning/aggregate.py \
-            --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
-            --task ${task} \
-            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated/${task}_aggregated.json
+            uv run python src/finetuning/aggregate.py \
+                --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
+                --task ${task} \
+                --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/aggregated/${task}_aggregated.json
+        done
+
+        # Plot learning dynamics from the aggregated results
+        echo "=== Plotting learning dynamics for ${model} (${language}) ==="
+
+        uv run python src/visualisation/plot_dynamics.py \
+            --aggregated-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/aggregated \
+            --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
+            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/plots/dynamics
     done
-
-    # Plot learning dynamics from the aggregated results
-    echo "=== Plotting learning dynamics for ${model} ==="
-
-    uv run python src/visualisation/plot_dynamics.py \
-        --aggregated-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/aggregated \
-        --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
-        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots/dynamics
 done

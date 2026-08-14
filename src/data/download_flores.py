@@ -1,5 +1,6 @@
 """
-Download the FLORES-200 devtest split for pseudo-perplexity evaluation.
+Download the FLORES-200 devtest split for pseudo-perplexity and cross-lingual
+alignment evaluation.
 
 Dataset: https://huggingface.co/datasets/facebook/flores
 """
@@ -26,8 +27,13 @@ load_dotenv()
 
 # FLORES-200 dataset constants
 DATASET_NAME = "facebook/flores"
-SUPPORTED_LANGUAGES = ["xho_Latn"]
 SPLIT = "devtest"
+
+# Single-language configurations (for pseudo-perplexity)
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
+
+# English-paired configs (for cross-lingual alignment)
+SUPPORTED_LANGUAGE_PAIRS = ["eng_Latn-xho_Latn", "eng_Latn-zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -37,7 +43,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="datasets/raw/flores",
+        default=os.path.join(os.environ.get("DATA_DIR", "datasets"), "raw/flores"),
         help="Directory to save the downloaded dataset to disk."
     )
     parser.add_argument(
@@ -50,7 +56,7 @@ def parse_args() -> Namespace:
         "--language",
         type=str,
         default="xho_Latn",
-        choices=SUPPORTED_LANGUAGES,
+        choices=SUPPORTED_LANGUAGES + SUPPORTED_LANGUAGE_PAIRS,
         help="FLORES-200 devtest subset to download."
     )
     return parser.parse_args()

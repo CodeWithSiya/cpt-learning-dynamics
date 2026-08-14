@@ -5,12 +5,12 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=4
-#SBATCH --time=2:00:00
-#SBATCH --job-name="cpt-perplexity"
+#SBATCH --time=02:00:00
+#SBATCH --job-name="cpt-layerwise"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/perplexity_%j.log
-#SBATCH --error=logs/perplexity_%j.log
+#SBATCH --output=logs/layerwise_%j.log
+#SBATCH --error=logs/layerwise_%j.log
 
 # Update to latest commit
 git pull
@@ -36,7 +36,7 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# All models available for perplexity computation
+# All models available for layer-wise alignment computation
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
 # All language subsets to evaluate on
@@ -47,6 +47,9 @@ declare -A FLORES_CODES=(
     ["xho"]="xho_Latn"
     ["zul"]="zul_Latn"
 )
+
+# Representative CPT checkpoints spanning both phases of the checkpoint schedule
+CHECKPOINTS="0,40000,100000,140000,200000"
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -67,13 +70,14 @@ fi
 for model in "${MODELS[@]}"; do
     for language in "${LANGUAGES[@]}"; do
         flores_code="${FLORES_CODES[$language]}"
-        echo "=== Computing pseudo-perplexity for ${model} (${language}) ==="
+        echo "=== Computing layer-wise alignment for ${model} (${language}) ==="
 
-        uv run python src/evaluation/perplexity.py \
+        uv run python src/evaluation/layerwise.py \
             --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
             --flores-dir ${DATA_DIR}/raw/flores \
             --language ${flores_code} \
-            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/perplexity/${flores_code}_perplexity.json \
-            --batch-size 32
+            --checkpoints ${CHECKPOINTS} \
+            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/alignment/${flores_code}_layerwise.json \
+            --batch-size 64
     done
 done

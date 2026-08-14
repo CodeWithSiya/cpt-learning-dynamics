@@ -1,0 +1,8 @@
+# Fine-Tuning Configuration
+learning_rate: 2.0e-5
+epochs: 5
+batch_size: 32
+warmup_ratio: 0.1
+
+# Experiment Tracking
+wandb_project: "cpt-learning-dynamics"

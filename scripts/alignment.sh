@@ -5,12 +5,12 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=4
-#SBATCH --time=2:00:00
-#SBATCH --job-name="cpt-perplexity"
+#SBATCH --time=02:00:00
+#SBATCH --job-name="cpt-alignment"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/perplexity_%j.log
-#SBATCH --error=logs/perplexity_%j.log
+#SBATCH --output=logs/alignment_%j.log
+#SBATCH --error=logs/alignment_%j.log
 
 # Update to latest commit
 git pull
@@ -36,7 +36,7 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# All models available for perplexity computation
+# All models available for alignment computation
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
 # All language subsets to evaluate on
@@ -67,13 +67,13 @@ fi
 for model in "${MODELS[@]}"; do
     for language in "${LANGUAGES[@]}"; do
         flores_code="${FLORES_CODES[$language]}"
-        echo "=== Computing pseudo-perplexity for ${model} (${language}) ==="
+        echo "=== Computing cross-lingual alignment for ${model} (${language}) ==="
 
-        uv run python src/evaluation/perplexity.py \
+        uv run python src/evaluation/alignment.py \
             --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
             --flores-dir ${DATA_DIR}/raw/flores \
             --language ${flores_code} \
-            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/perplexity/${flores_code}_perplexity.json \
-            --batch-size 32
+            --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/alignment/${flores_code}_alignment.json \
+            --batch-size 64
     done
 done

@@ -1,7 +1,6 @@
 # Task Configuration
-task_name: "ntc"
+task_name: "ntc_xho"
 task_type: "sequence_classification"
-dataset_path: "datasets/raw/evaluation/ntc"
 
 # Dataset Fields
 input_field: "text"

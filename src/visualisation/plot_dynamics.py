@@ -27,7 +27,8 @@ LINE_WIDTH = 1.4
 TASK_METRICS = {
     "ner": "f1",
     "pos": "f1",
-    "ntc": "f1"
+    "ntc_xho": "f1",
+    "ntc_zul": "f1"
 }
 
 # Colour palette, one colour per task

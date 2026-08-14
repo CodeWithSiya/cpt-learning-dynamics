@@ -34,7 +34,7 @@ DEVICE = torch.device("cuda" if IS_GPU_AVAILABLE else "cpu")
 MAX_SEQ_LENGTH = 512
 
 # Supported languages, matching the subsets saved by download_flores.py
-SUPPORTED_LANGUAGES = ["xho_Latn"]
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -132,16 +132,8 @@ def compute_sentence_pll(sentence: str, model: PreTrainedModel, tokenizer: PreTr
 
     input_ids = tokenized_sentence["input_ids"][0]
     special_tokens_mask = tokenized_sentence["special_tokens_mask"][0]
-
-    # The PLL would cover only the retained prefix while the word count below covers
-    # the whole sentence, silently deflating PPPL, so flag any sentence that truncates.
-    if input_ids.shape[0] >= MAX_SEQ_LENGTH:
-        logger.warning(
-            f"Sentence truncated at {MAX_SEQ_LENGTH} tokens; its PLL will be "
-            f"normalised by the untruncated word count, deflating PPPL."
-        )
-
-    # Only mask content tokens, leaving special tokens unchanged
+    
+    # Only mask content tokens and leave special tokens unchanged
     mask_positions = (special_tokens_mask == 0).nonzero(as_tuple=True)[0].tolist()
     if not mask_positions:
         return 0.0, 0

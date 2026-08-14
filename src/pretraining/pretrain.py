@@ -135,6 +135,12 @@ def parse_args() -> Namespace:
         help="Path to the pre-tokenized validation corpus on disk (output of src/data/preprocess_wura.py)."
     )
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory to save checkpoints and logs to. Overrides output_dir in the model config."
+    )
+    parser.add_argument(
         "--wandb-run-id",
         type=str,
         default=None,
@@ -172,13 +178,14 @@ def get_full_log_history(checkpoint_dir: Path) -> list[dict]:
 
     return state.get("log_history", [])
 
-def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corpus_path: str, wandb_run_id: Optional[str] = None) -> None:
+def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corpus_path: str, output_dir_override: Optional[str] = None, wandb_run_id: Optional[str] = None) -> None:
     """
     Run continued MLM pretraining for a single model config.
 
     :param config: ModelConfig loaded from YAML.
     :param train_corpus_path: Path to the pre-tokenized, chunked training corpus on disk.
     :param validation_corpus_path: Path to the pre-tokenized, chunked validation corpus on disk.
+    :param output_dir_override: Directory to save checkpoints and logs to, overriding the config.
     :param wandb_run_id: Optional W&B run ID for resuming a specific run.
     """
     total_steps = config.total_steps
@@ -205,7 +212,7 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     print(f"Checkpoint schedule ({len(checkpoint_steps)} checkpoints): {checkpoint_steps}", flush=True)
 
     # Initialise output directory
-    output_dir = Path(config.output_dir)
+    output_dir = Path(output_dir_override or config.output_dir)
     checkpoint_dir = output_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -307,6 +314,7 @@ def main() -> None:
         config, 
         train_corpus_path=args.train_corpus, 
         validation_corpus_path=args.validation_corpus,
+        output_dir_override=args.output_dir,
         wandb_run_id=args.wandb_run_id
     )
 

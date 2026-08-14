@@ -32,19 +32,26 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # All models available for plotting
-ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
-# All evaluation tasks
-ALL_TASKS=("ner" "pos" "ntc")
+# All language subsets available for plotting
+ALL_LANGUAGES=("xho" "zul")
+
+# Evaluation tasks available for each language
+declare -A LANGUAGE_TASKS=(
+    ["xho"]="ner pos ntc_xho"
+    ["zul"]="ner pos ntc_zul"
+)
 
 # Seeds available for plotting
-ALL_SEEDS=(42 123)
+ALL_SEEDS=(42 123 456 789 1738)
 
 # Display names used in plot titles
 declare -A MODEL_DISPLAY_NAMES=(
     ["roberta"]="RoBERTa"
     ["xlmr"]="XLMR"
     ["nguni-xlmr"]="Nguni-XLMR"
+    ["afriberta"]="AfriBERTa"
 )
 
 # First script argument selects a single model; if omitted, loop through all models
@@ -55,12 +62,12 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-# Second script argument selects a single task; if omitted, loop through all tasks
-TASK_ARG="$2"
-if [ -n "${TASK_ARG}" ]; then
-    TASKS=("${TASK_ARG}")
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
 else
-    TASKS=("${ALL_TASKS[@]}")
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
 fi
 
 # Third script argument selects a single seed; if omitted, loop through all seeds
@@ -72,16 +79,18 @@ else
 fi
 
 for model in "${MODELS[@]}"; do
-    for task in "${TASKS[@]}"; do
-        for seed in "${SEEDS[@]}"; do
-            echo "=== Plotting fine-tuning grid for ${model}, ${task}, seed ${seed} ==="
+    for language in "${LANGUAGES[@]}"; do
+        for task in ${LANGUAGE_TASKS[$language]}; do
+            for seed in "${SEEDS[@]}"; do
+                echo "=== Plotting fine-tuning grid for ${model}, ${task} (${language}), seed ${seed} ==="
 
-            uv run python src/visualisation/plot_finetune.py \
-                --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/finetuning \
-                --task ${task} \
-                --seed ${seed} \
-                --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
-                --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots/finetune
+                uv run python src/visualisation/plot_finetune.py \
+                    --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
+                    --task ${task} \
+                    --seed ${seed} \
+                    --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
+                    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/plots/finetune
+            done
         done
     done
 done

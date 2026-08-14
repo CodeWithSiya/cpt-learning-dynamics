@@ -18,6 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Constant Values
+GRID_COLUMNS = 5
+
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -97,8 +100,8 @@ def plot_finetune_grid(results_by_step: dict[int, list[dict]], task: str, model_
     steps = sorted(results_by_step.keys())
     num_checkpoints = len(steps)
 
-    # Arrange checkpoints in a grid with 5 columns
-    num_cols = 5
+    # Arrange checkpoints in a grid with a fixed number of columns
+    num_cols = GRID_COLUMNS
     num_rows = (num_checkpoints + num_cols - 1) // num_cols
 
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(4 * num_cols, 3 * num_rows), squeeze=False)
@@ -137,6 +140,7 @@ def plot_finetune_grid(results_by_step: dict[int, list[dict]], task: str, model_
     fig.supylabel("Loss")
     fig.suptitle(f"Fine-tuning Loss per Checkpoint: {model_name} ({task.upper()})", fontsize=13)
 
+    # Write the figure to disk and close it
     fig.tight_layout()
     fig.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close(fig)

@@ -32,14 +32,18 @@ cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
 # All models available for CPT loss plotting
-ALL_MODELS=("roberta" "xlmr" "nguni-xlmr")
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
 
 # Display names used in plot titles
 declare -A MODEL_DISPLAY_NAMES=(
     ["roberta"]="RoBERTa"
     ["xlmr"]="XLMR"
     ["nguni-xlmr"]="Nguni-XLMR"
+    ["afriberta"]="AfriBERTa"
 )
+
+# All language subsets available for plotting
+ALL_LANGUAGES=("xho" "zul")
 
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
@@ -49,11 +53,21 @@ else
     MODELS=("${ALL_MODELS[@]}")
 fi
 
-for model in "${MODELS[@]}"; do
-    echo "=== Plotting CPT loss curve for ${model} ==="
+# Second script argument selects a single language; if omitted, loop through all languages
+LANGUAGE_ARG="$2"
+if [ -n "${LANGUAGE_ARG}" ]; then
+    LANGUAGES=("${LANGUAGE_ARG}")
+else
+    LANGUAGES=("${ALL_LANGUAGES[@]}")
+fi
 
-    uv run python src/visualisation/plot_cpt.py \
-        --log-history ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/log_history.json \
-        --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
-        --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/plots/cpt
+for model in "${MODELS[@]}"; do
+    for language in "${LANGUAGES[@]}"; do
+        echo "=== Plotting CPT loss curve for ${model} (${language}) ==="
+
+        uv run python src/visualisation/plot_cpt.py \
+            --log-history ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/log_history.json \
+            --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
+            --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/plots/cpt
+    done
 done
