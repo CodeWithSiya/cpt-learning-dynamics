@@ -11,11 +11,13 @@ Datasets:
 import argparse
 import logging
 import os
+import time
 from dotenv import load_dotenv
 from argparse import Namespace
 from dataclasses import dataclass
 from typing import cast, Optional
 
+import requests
 from datasets import DatasetDict, load_dataset
 from huggingface_hub import get_token
 
@@ -44,6 +46,10 @@ ANTC_URL = "https://raw.githubusercontent.com/uds-lsv/afro-maft/main/dataset/ANT
 
 # Remote ANTC split filenames differ from the canonical split names used downstream
 ANTC_SPLIT_FILES = {"train": "train", "validation": "dev", "test": "test"}
+
+# Retry settings for the raw TSV downloads
+TSV_MAX_ATTEMPTS = 5
+TSV_RETRY_DELAY_SECONDS = 5
 
 # Evaluation tasks and datasets
 EVAL_TASKS = {
@@ -114,27 +120,89 @@ def parse_args() -> Namespace:
     )
     return parser.parse_args()
 
-def load_eval_dataset(task_name: str, config: EvalTaskConfig, language: str, cache_dir: Optional[str] = None) -> DatasetDict:
+def fetch_with_retries(url: str, task_name: str) -> bytes:
+    """
+    Fetch a URL, retrying on transient failures with a linear backoff.
+
+    :param url: URL to fetch.
+    :param task_name: Name of the evaluation task, used in log messages.
+    :return: Raw response body.
+    """
+    for attempt in range(1, TSV_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.get(url, timeout=60)
+            response.raise_for_status()
+            return response.content
+        except requests.RequestException as error:
+            if attempt == TSV_MAX_ATTEMPTS:
+                raise
+
+            delay = TSV_RETRY_DELAY_SECONDS * attempt
+            logger.warning(
+                f"[{task_name}] attempt {attempt}/{TSV_MAX_ATTEMPTS} failed for {url} "
+                f"({error}), retrying in {delay}s..."
+            )
+            time.sleep(delay)
+
+    raise RuntimeError(f"[{task_name}] exhausted retries for {url}")
+
+def download_tsv_splits(task_name: str, config: EvalTaskConfig, language: str, output_dir: str) -> dict[str, str]:
+    """
+    Download a task's remote TSV splits to disk, one file per split.
+
+    Fetched with requests rather than letting datasets stream the URLs, as the
+    fsspec HTTP backend ignores the http_proxy environment variables that HPC
+    compute nodes need to reach hosts outside the university network.
+
+    :param task_name: Name of the evaluation task.
+    :param config: EvalTaskConfig for this task, with a tsv_url template.
+    :param language: Language subset to download.
+    :param output_dir: Root directory for evaluation datasets.
+    :return: Mapping from split name to local TSV file path.
+    """
+    if config.tsv_url is None:
+        raise ValueError(f"[{task_name}] has no TSV URL to download from")
+
+    # Keep the raw TSVs beside the saved dataset directory
+    tsv_dir = os.path.join(output_dir, task_name, "tsv", language)
+    os.makedirs(tsv_dir, exist_ok=True)
+
+    local_paths = {}
+
+    for split, file in ANTC_SPLIT_FILES.items():
+        url = config.tsv_url.format(language=language, file=file)
+        local_path = os.path.join(tsv_dir, f"{file}.tsv")
+
+        content = fetch_with_retries(url, task_name)
+
+        with open(local_path, "wb") as f:
+            f.write(content)
+
+        logger.info(f"[{task_name}] downloaded {split} split to {local_path}")
+        local_paths[split] = local_path
+
+    return local_paths
+
+def load_eval_dataset(task_name: str, config: EvalTaskConfig, language: str, output_dir: str,
+                      cache_dir: Optional[str] = None) -> DatasetDict:
     """
     Load a single evaluation dataset from HuggingFace.
 
     :param task_name: Name of the evaluation task.
     :param config: EvalTaskConfig for this task.
     :param language: Language subset to download.
+    :param output_dir: Root directory for evaluation datasets, used for raw TSV downloads.
     :param cache_dir: HuggingFace cache directory.
     :return: DatasetDict with train, validation and test splits.
     """
     logger.info(f"Loading {config.description} ({language})...")
 
-    # ANTC is not hosted on HuggingFace, so read its TSV files directly. Categories are left
-    # as strings, so preprocessing maps them to label IDs via the task config.
     if config.tsv_url is not None:
+        data_files = download_tsv_splits(task_name, config, language, output_dir)
+
         return cast(DatasetDict, load_dataset(
             path="csv",
-            data_files={
-                split: config.tsv_url.format(language=language, file=file)
-                for split, file in ANTC_SPLIT_FILES.items()
-            },
+            data_files=data_files,
             delimiter="\t",
             cache_dir=cache_dir
         ))
@@ -198,6 +266,8 @@ def main() -> None:
     logger.info(f"Downloading tasks: {args.tasks}")
     logger.info(f"Language: {args.language}")
 
+    failed_tasks = []
+
     for task_name in args.tasks:
         config = EVAL_TASKS[task_name]
 
@@ -209,19 +279,28 @@ def main() -> None:
             )
             continue
 
-        dataset = load_eval_dataset(
-            task_name=task_name,
-            config=config,
-            language=args.language,
-            cache_dir=cache_dir
-        )
-        log_dataset_info(task_name, dataset)
-        save_eval_dataset(
-            dataset=dataset,
-            task_name=task_name,
-            language=args.language,
-            output_dir=args.output_dir
-        )
+        # Keep going after a failure
+        try:
+            dataset = load_eval_dataset(
+                task_name=task_name,
+                config=config,
+                language=args.language,
+                output_dir=args.output_dir,
+                cache_dir=cache_dir
+            )
+            log_dataset_info(task_name, dataset)
+            save_eval_dataset(
+                dataset=dataset,
+                task_name=task_name,
+                language=args.language,
+                output_dir=args.output_dir
+            )
+        except Exception:
+            logger.exception(f"[{task_name}] failed to download ({args.language})")
+            failed_tasks.append(task_name)
+
+    if failed_tasks:
+        raise RuntimeError(f"Failed to download tasks: {failed_tasks}")
 
     logger.info("All downloads complete.")
 

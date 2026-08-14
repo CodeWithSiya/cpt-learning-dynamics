@@ -19,6 +19,8 @@ from transformers import (
     logging as hf_logging
 )
 
+from IsoScore import IsoScore
+
 from src.evaluation.embeddings import (
     DEFAULT_BATCH_SIZE,
     PIVOT_LANGUAGE,
@@ -102,7 +104,16 @@ def discover_checkpoints(checkpoint_dir: Path) -> list[Path]:
 
     return checkpoints
 
-def compute_alignment_score(english_sentences: list[str], target_sentences: list[str], 
+def compute_iso_score(embeddings: np.ndarray) -> float:
+    """
+    Compute the IsoScore of a point cloud, following Rudman et al. (2022).
+
+    :param embeddings: Array of shape (N, D), one embedding per row.
+    :return: IsoScore in [0, 1], where 1 indicates a perfectly isotropic cloud.
+    """
+    return float(IsoScore.IsoScore(embeddings.astype(np.float64)))
+
+def compute_alignment_score(english_sentences: list[str], target_sentences: list[str],
                             model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, device: torch.device,
                             batch_size: int) -> dict:
     """
@@ -115,7 +126,7 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
     :param tokenizer: Tokenizer matching the model.
     :param device: Device to run the embedding lookup on.
     :param batch_size: Number of sentences to embed per forward pass.
-    :return: Dictionary with matched, baseline and cosine gap scores.
+    :return: Dictionary with matched, baseline, cosine gap, P@1 and IsoScore values.
     """
     # Compute static embeddings for each example sentence
     english_embeddings = embed_sentences(english_sentences, model, tokenizer, device, batch_size)
@@ -139,12 +150,18 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
     english_to_target_predictions = similarity_matrix.argmax(axis=0)
     p_at_1_english_to_target = float(np.mean(english_to_target_predictions == np.arange(n)))
 
+    # Compute the isotropy of the shared bilingual representation space
+    iso_score_shared = compute_iso_score(
+        np.concatenate([english_embeddings, target_embeddings], axis=0)
+    )
+
     return {
         "matched_cosine_similarity": matched_mean,
         "baseline_cosine_similarity": baseline_mean,
         "cosine_gap": matched_mean - baseline_mean,
         "p_at_1_target_to_english": p_at_1_target_to_english,
         "p_at_1_english_to_target": p_at_1_english_to_target,
+        "iso_score_shared": iso_score_shared
     }
 
 def main():
