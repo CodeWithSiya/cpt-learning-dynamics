@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # Figure styling
 FIGURE_SIZE = (10, 6)
 LINE_WIDTH = 1.4
-MARKER_SIZE = 3
 
 # Display name for each model, used in plot titles and legends
 MODEL_DISPLAY_NAMES = {
@@ -35,9 +34,6 @@ MODEL_DISPLAY_NAMES = {
 # Colour palette, one colour per model
 PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
 
-# Sequential colour map for checkpoints, so training order reads off the figure
-CHECKPOINT_COLOUR_MAP = "viridis"
-
 # Axis label and title fragment for every metric layerwise.py reports
 METRIC_LABELS = {
     "matched_cosine_similarity": ("Cosine Similarity", "Matched Pair Cosine Similarity"),
@@ -47,9 +43,6 @@ METRIC_LABELS = {
     "p_at_1_target_to_english": ("P@1", "Top-1 Retrieval Accuracy (Target to English)"),
     "iso_score_shared": ("IsoScore", "Isotropy of the Shared Bilingual Space")
 }
-
-# Metrics bounded to [0, 1], so their axis can be pinned to the full range
-BOUNDED_METRICS = ["p_at_1_english_to_target", "p_at_1_target_to_english", "iso_score_shared"]
 
 # Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
@@ -137,30 +130,21 @@ def layer_positions(num_values: int, relative: bool) -> np.ndarray:
 
     return layers
 
-def configure_axes(ax, metric: str, title: str, relative: bool) -> None:
+def configure_axes(ax, metric: str, title: str) -> None:
     """
     Apply labels, limits and grid styling to a layer-wise plot.
 
     :param ax: Axes to configure.
     :param metric: Metric being plotted, used for the y-axis label.
     :param title: Plot title.
-    :param relative: Whether the x-axis shows relative depth or layer index.
     """
     ylabel, _ = METRIC_LABELS[metric]
 
-    ax.set_xlabel("Relative Depth" if relative else "Layer")
+    ax.set_xlabel("Layer")
     ax.set_ylabel(ylabel)
     ax.set_title(title)
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 
-    # Layer indices are integers, so avoid fractional ticks on the absolute axis
-    if not relative:
-        ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-
-    # P@1 and IsoScore are bounded, so pin the axis to their full range
-    if metric in BOUNDED_METRICS:
-        ax.set_ylim(0, 1)
-
-    ax.axhline(0, color="gray", linewidth=0.8, linestyle="--")
     ax.grid(True, alpha=0.3, linestyle=":", which="both")
 
 def save_figure(fig, output_path: Path, description: str) -> None:
@@ -191,11 +175,7 @@ def plot_model_layerwise(model: str, layerwise_by_step: dict[int, dict], metric:
 
     steps = sorted(layerwise_by_step.keys())
 
-    # Shade each checkpoint by its position in the training trajectory
-    colour_map = plt.get_cmap(CHECKPOINT_COLOUR_MAP)
-    colours = colour_map(np.linspace(0, 0.9, len(steps)))
-
-    for step, colour in zip(steps, colours):
+    for step in steps:
         values = metric_series(layerwise_by_step[step], metric)
 
         if values.size == 0:
@@ -207,9 +187,6 @@ def plot_model_layerwise(model: str, layerwise_by_step: dict[int, dict], metric:
             values,
             label=f"step {step:,}",
             linewidth=LINE_WIDTH,
-            marker="o",
-            markersize=MARKER_SIZE,
-            color=colour
         )
 
     _, title = METRIC_LABELS[metric]
@@ -217,54 +194,10 @@ def plot_model_layerwise(model: str, layerwise_by_step: dict[int, dict], metric:
         ax,
         metric,
         f"{title} by Layer ({MODEL_DISPLAY_NAMES[model]})",
-        relative=False
     )
     ax.legend(loc="best", fontsize=9, title="Checkpoint")
 
     save_figure(fig, output_path, f"{model} layer-wise {metric}")
-
-def plot_final_checkpoint_comparison(layerwise_by_model: dict[str, dict[int, dict]], metric: str,
-                                     output_path: Path) -> None:
-    """
-    Plot every model's layer-wise profile at its final checkpoint on a single figure.
-
-    Models differ in depth, so the x-axis shows relative depth or an
-    absolute layer index.
-
-    :param layerwise_by_model: Mapping from model name to layer-wise results.
-    :param metric: Which metric to plot.
-    :param output_path: File path to save the plot image to.
-    """
-    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
-
-    for i, (model, layerwise_by_step) in enumerate(layerwise_by_model.items()):
-        final_step = max(layerwise_by_step.keys())
-        values = metric_series(layerwise_by_step[final_step], metric)
-
-        if values.size == 0:
-            logger.warning(f"No '{metric}' values for '{model}' at step {final_step}, skipping.")
-            continue
-
-        ax.plot(
-            layer_positions(values.size, relative=True),
-            values,
-            label=f"{MODEL_DISPLAY_NAMES[model]} ({values.size - 1} layers)",
-            linewidth=LINE_WIDTH,
-            marker="o",
-            markersize=MARKER_SIZE,
-            color=PALETTE[i % len(PALETTE)]
-        )
-
-    _, title = METRIC_LABELS[metric]
-    configure_axes(
-        ax,
-        metric,
-        f"{title} by Layer at the Final Checkpoint",
-        relative=True
-    )
-    ax.legend(loc="best", fontsize=9)
-
-    save_figure(fig, output_path, f"all-models final-checkpoint layer-wise {metric}")
 
 def main() -> None:
     """Main entry point for plotting layer-wise alignment profiles."""
@@ -297,7 +230,6 @@ def main() -> None:
         return
 
     for metric in args.metrics:
-        # Plot each model's depth profile separately, since models differ in layer count
         for model, layerwise_by_step in layerwise_by_model.items():
             plot_model_layerwise(
                 model,
@@ -305,13 +237,6 @@ def main() -> None:
                 metric,
                 output_path=output_dir / f"{model}_{args.language}_layerwise_{metric}.png"
             )
-
-        # Compare all models at their final checkpoint on a shared relative-depth axis
-        plot_final_checkpoint_comparison(
-            layerwise_by_model,
-            metric,
-            output_path=output_dir / f"all_models_{args.language}_layerwise_{metric}.png"
-        )
 
 if __name__ == "__main__":
     main()

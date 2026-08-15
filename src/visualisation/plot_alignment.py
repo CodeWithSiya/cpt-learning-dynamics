@@ -47,9 +47,6 @@ METRIC_LABELS = {
     "iso_score_shared": ("IsoScore", "Isotropy of the Shared Bilingual Space")
 }
 
-# Metrics bounded to [0, 1], so their axis can be pinned to the full range
-BOUNDED_METRICS = ["p_at_1_english_to_target", "p_at_1_target_to_english", "iso_score_shared"]
-
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -180,9 +177,6 @@ def plot_model_metric(alignment_by_model: dict[str, dict[int, dict]], metric: st
 
     # Add labels and formatting
     configure_axes(ax, sorted(set(all_steps)), ylabel, title)
-
-    if metric in BOUNDED_METRICS:
-        ax.set_ylim(0, 1)
 
     ax.legend(loc="best", fontsize=9)
 

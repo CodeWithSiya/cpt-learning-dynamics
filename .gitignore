@@ -234,3 +234,6 @@ wandb
 
 # Local Scripts
 download_plots.sh
+
+# Results
+results
