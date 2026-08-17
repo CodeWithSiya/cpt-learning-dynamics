@@ -21,6 +21,7 @@ dependencies = [
     "sentencepiece>=0.2.2",
     "tiktoken>=0.13.0",
     "isoscore>=2.0.1",
+    "scienceplots>=2.2.2",
 ]
 
 [tool.uv.sources]
