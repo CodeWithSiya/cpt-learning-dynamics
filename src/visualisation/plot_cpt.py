@@ -121,16 +121,23 @@ def configure_step_axis(ax, steps: list[int]) -> None:
 
 def configure_value_axis(ax) -> None:
     """
-    Scale the loss axis to the data and end it exactly on a tick.
+    Scale the loss axis from zero and end it a tick clear of the data.
 
     :param ax: Axes to configure.
     """
     locator = ticker.MaxNLocator(nbins=6, steps=[1, 2, 2.5, 5, 10])
     ax.yaxis.set_major_locator(locator)
 
-    low, high = ax.dataLim.intervaly
-    ticks = locator.tick_values(low, high)
-    ax.set_ylim(max(t for t in ticks if t <= low), min(t for t in ticks if t >= high))
+    high = ax.dataLim.intervaly[1]
+    ticks = locator.tick_values(0.0, high)
+    step = ticks[1] - ticks[0]
+
+    # Keep a tick of headroom so the topmost label never crowds the title
+    top = min(t for t in ticks if t >= high)
+    if top - high < 0.25 * step:
+        top += step
+
+    ax.set_ylim(0.0, top)
 
 def configure_axes(ax, steps: list[int], ylabel: str, title: str) -> None:
     """
