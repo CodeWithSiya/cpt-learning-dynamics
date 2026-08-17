@@ -1,5 +1,5 @@
 """
-Plot CPT training and validation loss curves from a completed run's history.
+Plot CPT training and validation loss curves across models.
 """
 
 import argparse
@@ -9,6 +9,9 @@ from argparse import Namespace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
+import style
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -17,28 +20,60 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Figure styling
+FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
+
+# Display name for each model, used in plot titles and legends
+MODEL_DISPLAY_NAMES = {
+    "roberta": "RoBERTa",
+    "xlmr": "XLMR",
+    "nguni-xlmr": "Nguni-XLMR",
+    "afriberta": "AfriBERTa"
+}
+
+# Display name for each supported language, used in plot titles
+LANGUAGE_DISPLAY_NAMES = {
+    "xho": "isiXhosa",
+    "zul": "isiZulu"
+}
+
+# Axis label and plot title for every loss the trainer logs
+LOSS_LABELS = {
+    "loss": ("Training Loss", "Continued Pretraining Training Loss"),
+    "eval_loss": ("Validation Loss", "Continued Pretraining Validation Loss")
+}
+
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Plot CPT training and validation loss curves."
+        description="Plot CPT training and validation loss curves across models."
     )
     parser.add_argument(
-        "--log-history",
+        "--results-dir",
         type=str,
         required=True,
-        help="Path to log_history.json."
+        help="Root results directory containing the per-model result folders."
     )
     parser.add_argument(
-        "--model-name",
+        "--models",
         type=str,
-        required=True,
-        help="Model name, used in the plot title and output filename."
+        nargs="+",
+        default=list(MODEL_DISPLAY_NAMES),
+        choices=list(MODEL_DISPLAY_NAMES),
+        help="Models to plot. Defaults to every model."
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="xho",
+        choices=list(LANGUAGE_DISPLAY_NAMES),
+        help="Language subset the models were continually pretrained on."
     )
     parser.add_argument(
         "--output-dir",
         type=str,
         required=True,
-        help="Directory to save the plot images to."
+        help="Directory to save the combined all-models plot to."
     )
     return parser.parse_args()
 
@@ -52,107 +87,156 @@ def load_log_history(path: Path) -> list[dict]:
     with open(path) as f:
         log_history = json.load(f)
 
-    logger.info(f"Loaded {len(log_history)} log entries from {path}")
+    logger.info(f"Loaded {len(log_history)} log entries from {path.name}.")
     return log_history
 
-def plot_train_loss_curve(log_history: list[dict], model_name: str, output_path: Path) -> None:
+def loss_series(log_history: list[dict], loss: str) -> tuple[list[int], list[float]]:
     """
-    Plot the training loss curve across CPT steps.
+    Extract a loss curve from a log history.
 
-    :param log_history: Full log history.
-    :param model_name: Model name, used in the plot title.
-    :param output_path: File path to save the plot image to.
+    :param log_history: Full log history for one model.
+    :param loss: Which loss field to read (e.g. "eval_loss").
+    :return: Checkpoint steps and their loss values.
     """
-    # Collect training losses
-    train_points = []
+    points = [(entry["step"], entry[loss]) for entry in log_history if loss in entry]
 
-    for entry in log_history:
-        step = entry["step"]
+    if not points:
+        return [], []
 
-        if "loss" in entry:
-            train_points.append((step, entry["loss"]))
+    steps, values = zip(*sorted(points))
+    return list(steps), list(values)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+def configure_step_axis(ax, steps: list[int]) -> None:
+    """
+    Configure the checkpoint step axis.
 
-    # Plot the training loss curve
-    if train_points:
-        train_steps, train_values = zip(*train_points)
-        ax.plot(train_steps, train_values, color="lightcoral")
-    else:
-        logger.warning("No training loss entries found in log history.")
+    :param ax: Axes to configure.
+    :param steps: Checkpoint steps being plotted.
+    """
+    ax.set_xlim(min(steps), max(steps))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, steps=[1, 2, 5, 10]))
+    ax.xaxis.set_major_formatter(
+        ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
+    )
 
-    # Add labels and formatting
+def configure_value_axis(ax) -> None:
+    """
+    Scale the loss axis to the data and end it exactly on a tick.
+
+    :param ax: Axes to configure.
+    """
+    locator = ticker.MaxNLocator(nbins=6, steps=[1, 2, 2.5, 5, 10])
+    ax.yaxis.set_major_locator(locator)
+
+    low, high = ax.dataLim.intervaly
+    ticks = locator.tick_values(low, high)
+    ax.set_ylim(max(t for t in ticks if t <= low), min(t for t in ticks if t >= high))
+
+def configure_axes(ax, steps: list[int], ylabel: str, title: str) -> None:
+    """
+    Apply labels, scales and grid styling to a loss plot.
+
+    :param ax: Axes to configure.
+    :param steps: Checkpoint steps being plotted.
+    :param ylabel: Y-axis label.
+    :param title: Plot title.
+    """
     ax.set_xlabel("Continued Pretraining Step")
-    ax.set_ylabel("Training Loss")
-    ax.set_title(f"Continued Pretraining Training Loss ({model_name})")
-    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    configure_step_axis(ax, steps)
+    configure_value_axis(ax)
+    ax.grid(True)
 
-    # Save the figure
+def save_figure(fig, output_path: Path, description: str) -> None:
+    """
+    Write a figure to disk and close it.
+
+    :param fig: Figure to save.
+    :param output_path: File path to save the plot image to.
+    :param description: Short description of the plot, used in the log message.
+    """
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    fig.savefig(output_path)
     plt.close(fig)
 
-    logger.info(f"Saved training loss curve to {output_path}")
+    logger.info(f"Saved {description} plot to {output_path}")
 
-def plot_eval_loss_curve(log_history: list[dict], model_name: str, output_path: Path) -> None:
+def plot_model_loss(log_history_by_model: dict[str, list[dict]], loss: str, language: str,
+                    output_path: Path) -> None:
     """
-    Plot the validation loss curve across CPT steps.
+    Plot one loss across CPT steps for all models on a single figure.
 
-    :param log_history: Full log history.
-    :param model_name: Model name, used in the plot title.
+    :param log_history_by_model: Mapping from model name to log history.
+    :param loss: Which loss field to plot.
+    :param language: Language the models were continually pretrained on.
     :param output_path: File path to save the plot image to.
     """
-    # Collect validation losses
-    eval_points = []
+    fig, ax = plt.subplots(figsize=FIGURE_SIZE)
 
-    for entry in log_history:
-        step = entry["step"]
+    ylabel, title = LOSS_LABELS[loss]
+    title = f"{title} ({LANGUAGE_DISPLAY_NAMES[language]})"
+    all_steps = []
 
-        if "eval_loss" in entry:
-            eval_points.append((step, entry["eval_loss"]))
+    # Plot the loss for each model
+    for model, log_history in log_history_by_model.items():
+        steps, values = loss_series(log_history, loss)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+        if not steps:
+            logger.warning(f"No '{loss}' entries for '{model}', skipping.")
+            continue
 
-    # Plot the validation loss curve
-    if eval_points:
-        eval_steps, eval_values = zip(*eval_points)
-        ax.plot(eval_steps, eval_values, color="cornflowerblue")
-    else:
-        logger.warning("No validation loss entries found in log history.")
+        all_steps.extend(steps)
+        ax.plot(steps, values, label=MODEL_DISPLAY_NAMES[model])
+
+    if not all_steps:
+        logger.error(f"No '{loss}' entries found for any model, skipping {output_path.name}.")
+        plt.close(fig)
+        return
 
     # Add labels and formatting
-    ax.set_xlabel("Continued Pretraining Step")
-    ax.set_ylabel("Validation Loss")
-    ax.set_title(f"Continued Pretraining Validation Loss ({model_name})")
-    ax.grid(True, linestyle="--", alpha=0.5)
+    configure_axes(ax, sorted(set(all_steps)), ylabel, title)
 
-    # Save the figure
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+    style.legend_below(fig, ax, ncol=len(log_history_by_model))
 
-    logger.info(f"Saved validation loss curve to {output_path}")
+    save_figure(fig, output_path, f"all-models {loss}")
 
 def main() -> None:
     """Main entry point for plotting CPT loss curves."""
     args = parse_args()
 
-    log_history_path = Path(args.log_history)
+    results_dir = Path(args.results_dir)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    log_history = load_log_history(log_history_path)
-    if not log_history:
-        logger.error(f"No log history found in {log_history_path}")
-        return
-    
-    # Build the output filenames from the model name
-    filename = args.model_name.lower().replace(" ", "_").replace("-", "_")
-    train_output_path = output_dir / f"{filename}_train_loss.png"
-    eval_output_path = output_dir / f"{filename}_eval_loss.png"
+    # Load the log history for every model that has been continually pretrained
+    log_history_by_model = {}
 
-    plot_train_loss_curve(log_history, args.model_name, train_output_path)
-    plot_eval_loss_curve(log_history, args.model_name, eval_output_path)
+    for model in args.models:
+        log_history_path = results_dir / f"{model}-large" / args.language / "log_history.json"
+
+        if not log_history_path.exists():
+            logger.warning(f"No log history for '{model}' in {results_dir}, skipping.")
+            continue
+
+        log_history = load_log_history(log_history_path)
+        if log_history:
+            log_history_by_model[model] = log_history
+        else:
+            logger.warning(f"Log history for '{model}' is empty, skipping.")
+
+    if not log_history_by_model:
+        logger.error(f"No log histories found in {results_dir}")
+        return
+
+    # Plot every loss for all models, one figure per loss
+    for loss in LOSS_LABELS:
+        plot_model_loss(
+            log_history_by_model,
+            loss,
+            args.language,
+            output_path=output_dir / f"all_models_{args.language}_{loss}.pdf"
+        )
 
 if __name__ == "__main__":
     main()
