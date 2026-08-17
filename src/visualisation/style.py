@@ -12,14 +12,13 @@ COLUMN_WIDTH = 3.335
 TEXT_WIDTH = 7.03
 
 PALETTE = [
-    "#1a84c1",  # blue
     "#e22e4c",  # crimson
-    "#56b4e9",  # sky blue  
+    "#01c993",  # green
     "#9d6ac7",  # purple
-    "#efac6d",  # vermillion
-    "#00ac7e",  # green
+    "#feb876",  # vermillion
+    "#56b4e9",  # sky blue
     "#db7eb1",  # pink
-    "#e69f00",  # amber
+    "#1a84c1",  # blue
 ]
 
 INK = "#0b0b0b"
@@ -36,6 +35,8 @@ plt.rcParams.update({
     "font.size": 9,
     "axes.labelsize": 9,
     "axes.titlesize": 9,
+    "axes.titlepad": 10,
+    "axes.labelpad": 5,
     "legend.fontsize": 8,
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
