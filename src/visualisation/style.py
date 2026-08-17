@@ -13,12 +13,22 @@ TEXT_WIDTH = 7.03
 
 PALETTE = [
     "#e22e4c",  # crimson
-    "#01c993",  # green
     "#9d6ac7",  # purple
-    "#feb876",  # vermillion
-    "#56b4e9",  # sky blue
+    "#feb876",  # peach-orange
     "#db7eb1",  # pink
-    "#1a84c1",  # blue
+    "#1e64cc",  # blue
+    "#00af81",  # green
+    "#56b4e9",  # sky blue
+    "#e6a62e",  # gold
+    "#f0785c",  # coral
+    "#b85aa8",  # magenta
+    "#745fc0",  # indigo
+    "#35a6a0",  # turquoise
+    "#8fba4a",  # yellow-green
+    "#d95f8d",  # raspberry
+    "#c8b63c",  # mustard
+    "#5c9bd5",  # medium blue
+    "#c875a6",  # mauve
 ]
 
 INK = "#0b0b0b"
@@ -45,7 +55,7 @@ plt.rcParams.update({
     "axes.edgecolor": MUTED_INK,
     "axes.labelcolor": INK,
     "text.color": INK,
-    "lines.linewidth": 1.2,
+    "lines.linewidth": 1.1,
     "lines.solid_capstyle": "round",
     "grid.linestyle": ":",
     "grid.linewidth": 0.5,
