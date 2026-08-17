@@ -14,10 +14,10 @@ TEXT_WIDTH = 7.03
 PALETTE = [
     "#1a84c1",  # blue
     "#e22e4c",  # crimson
-    "#e49152",  # vermillion
-    "#00ce97",  # green
+    "#d6884c",  # vermillion
     "#9d6ac7",  # purple
     "#56b4e9",  # sky blue
+    "#00ac7e",  # green
     "#db7eb1",  # pink
     "#e69f00",  # amber
 ]
@@ -44,7 +44,7 @@ plt.rcParams.update({
     "axes.edgecolor": MUTED_INK,
     "axes.labelcolor": INK,
     "text.color": INK,
-    "lines.linewidth": 1.5,
+    "lines.linewidth": 1.0,
     "lines.solid_capstyle": "round",
     "grid.linestyle": ":",
     "grid.linewidth": 0.5,
