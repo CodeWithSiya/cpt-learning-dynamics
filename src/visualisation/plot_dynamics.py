@@ -12,6 +12,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
+import style
+
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
@@ -20,8 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Figure styling
-FIGURE_SIZE = (10, 6)
-LINE_WIDTH = 1.4
+FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
 # Evaluation metric for each task
 TASK_METRICS = {
@@ -31,8 +32,13 @@ TASK_METRICS = {
     "ntc_zul": "f1"
 }
 
-# Colour palette, one colour per task
-PALETTE = ["lightcoral", "cornflowerblue", "lightgreen"]
+# Display name for each task, used in plot legends
+TASK_DISPLAY_NAMES = {
+    "ner": "NER",
+    "pos": "POS",
+    "ntc_xho": "NTC",
+    "ntc_zul": "NTC"
+}
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -94,24 +100,44 @@ def configure_step_axis(ax, steps: list[int]) -> None:
     :param steps: Checkpoint steps being plotted.
     """
     ax.set_xlim(min(steps), max(steps))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10, steps=[1, 2, 5, 10]))
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, steps=[1, 2, 5, 10]))
+    ax.xaxis.set_major_formatter(
+        ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
+    )
 
-def configure_axes(ax, steps: list[int], title: str, scale: bool = True) -> None:
+def configure_value_axis(ax) -> None:
+    """
+    Scale the F1 axis from zero and end it a tick clear of the data.
+
+    :param ax: Axes to configure.
+    """
+    locator = ticker.MaxNLocator(nbins=6, steps=[1, 2, 2.5, 5, 10])
+    ax.yaxis.set_major_locator(locator)
+
+    high = ax.dataLim.intervaly[1]
+    ticks = locator.tick_values(0.0, high)
+    step = ticks[1] - ticks[0]
+
+    # Keep a tick of headroom so the topmost label never crowds the title
+    top = min(t for t in ticks if t >= high)
+    if top - high < 0.25 * step:
+        top += step
+
+    # F1 cannot exceed one, so never leave headroom past it
+    ax.set_ylim(0.0, min(top, 1.0))
+
+def configure_axes(ax, steps: list[int]) -> None:
     """
     Apply the shared labels, scales and grid styling to a learning dynamics plot.
 
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted.
-    :param scale: Whether to scale the y-axis or not.
-    :param title: Plot title.
     """
     ax.set_xlabel("Continued Pretraining Step")
-    ax.set_ylabel("F1")
-    ax.set_title(title)
+    ax.set_ylabel("Macro F1")
     configure_step_axis(ax, steps)
-    if scale: ax.set_ylim(0, 1) 
-    ax.grid(True, alpha=0.3, linestyle=":")
+    configure_value_axis(ax)
+    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -122,18 +148,17 @@ def save_figure(fig, output_path: Path, description: str) -> None:
     :param description: Short description of the plot, used in the log message.
     """
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    fig.savefig(output_path)
     plt.close(fig)
 
     logger.info(f"Saved {description} plot to {output_path}")
 
-def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: str, output_path: Path) -> None:
+def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, output_path: Path) -> None:
     """
     Plot per-class F1 for a single task across continued pretraining checkpoints.
 
     :param aggregated: Mapping from checkpoint step to aggregated results.
-    :param task: Task name, used in the plot title.
-    :param model_name: Model name, used in the plot title.
+    :param task: Task name, used in the log message.
     :param output_path: File path to save the plot image to.
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
@@ -149,20 +174,20 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, model_name: 
     for class_name in sorted(class_names):
         means = metric_series([aggregated[s]["per_class_mean"].get(class_name) for s in steps])
 
-        ax.plot(steps, means, label=class_name, linewidth=LINE_WIDTH)
+        ax.plot(steps, means, label=class_name)
 
     # Add labels and formatting
-    configure_axes(ax, steps, f"{task.upper()} Per-Class Learning Dynamics ({model_name})")
-    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=8, frameon=True)
+    configure_axes(ax, steps)
+
+    style.legend_below(fig, ax, ncol=min(len(class_names), 4))
 
     save_figure(fig, output_path, f"{task} per-class")
 
-def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], model_name: str, output_path: Path) -> None:
+def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], output_path: Path) -> None:
     """
     Plot the overall F1 for all tasks on a single figure.
 
     :param aggregated_by_task: Mapping from task name to aggregated results.
-    :param model_name: Model name, used in the plot title.
     :param output_path: File path to save the plot image to.
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
@@ -170,18 +195,18 @@ def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], model_na
     all_steps = []
 
     # Plot the mean F1 for each task
-    for i, (task, aggregated) in enumerate(aggregated_by_task.items()):
+    for task, aggregated in aggregated_by_task.items():
         steps = sorted(aggregated.keys())
         all_steps.extend(steps)
 
         means = metric_series([aggregated[s]["overall_mean"] for s in steps])
-        color = PALETTE[i % len(PALETTE)]
 
-        ax.plot(steps, means, label=task.upper(), linewidth=LINE_WIDTH, color=color)
+        ax.plot(steps, means, label=TASK_DISPLAY_NAMES[task])
 
     # Add labels and formatting
-    configure_axes(ax, sorted(set(all_steps)), f"Learning Dynamics ({model_name})", scale=False)
-    ax.legend(loc="lower right", fontsize=9)
+    configure_axes(ax, sorted(set(all_steps)))
+
+    style.legend_below(fig, ax, ncol=len(aggregated_by_task))
 
     save_figure(fig, output_path, "all-tasks overview")
 
@@ -220,15 +245,13 @@ def main() -> None:
         plot_per_class_dynamics(
             aggregated,
             task=task,
-            model_name=args.model_name,
-            output_path=output_dir / f"{filename}_{task}_per_class.png"
+            output_path=output_dir / f"{filename}_{task}_per_class.pdf"
         )
 
     # Plot overall learning dynamics for all tasks on a single figure
     plot_model_dynamics(
         aggregated_by_task,
-        model_name=args.model_name,
-        output_path=output_dir / f"{filename}_overall.png"
+        output_path=output_dir / f"{filename}_overall.pdf"
     )
 
 if __name__ == "__main__":

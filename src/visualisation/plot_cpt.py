@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Figure styling
 FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Display name for each model, used in plot titles and legends
+# Display name for each model
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -31,16 +31,13 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Display name for each supported language, used in plot titles
-LANGUAGE_DISPLAY_NAMES = {
-    "xho": "isiXhosa",
-    "zul": "isiZulu"
-}
+# Supported languages
+SUPPORTED_LANGUAGES = ["xho", "zul"]
 
-# Axis label and plot title for every loss the trainer logs
+# Axis label for every loss the trainer logs
 LOSS_LABELS = {
-    "loss": ("Training Loss", "Continued Pretraining Training Loss"),
-    "eval_loss": ("Validation Loss", "Continued Pretraining Validation Loss")
+    "loss": "Training Loss",
+    "eval_loss": "Validation Loss"
 }
 
 def parse_args() -> Namespace:
@@ -66,7 +63,7 @@ def parse_args() -> Namespace:
         "--language",
         type=str,
         default="xho",
-        choices=list(LANGUAGE_DISPLAY_NAMES),
+        choices=SUPPORTED_LANGUAGES,
         help="Language subset the models were continually pretrained on."
     )
     parser.add_argument(
@@ -139,18 +136,16 @@ def configure_value_axis(ax) -> None:
 
     ax.set_ylim(0.0, top)
 
-def configure_axes(ax, steps: list[int], ylabel: str, title: str) -> None:
+def configure_axes(ax, steps: list[int], ylabel: str) -> None:
     """
     Apply labels, scales and grid styling to a loss plot.
 
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted.
     :param ylabel: Y-axis label.
-    :param title: Plot title.
     """
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
     configure_step_axis(ax, steps)
     configure_value_axis(ax)
     ax.grid(True)
@@ -169,20 +164,18 @@ def save_figure(fig, output_path: Path, description: str) -> None:
 
     logger.info(f"Saved {description} plot to {output_path}")
 
-def plot_model_loss(log_history_by_model: dict[str, list[dict]], loss: str, language: str,
+def plot_model_loss(log_history_by_model: dict[str, list[dict]], loss: str,
                     output_path: Path) -> None:
     """
     Plot one loss across CPT steps for all models on a single figure.
 
     :param log_history_by_model: Mapping from model name to log history.
     :param loss: Which loss field to plot.
-    :param language: Language the models were continually pretrained on.
     :param output_path: File path to save the plot image to.
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
 
-    ylabel, title = LOSS_LABELS[loss]
-    title = f"{title} ({LANGUAGE_DISPLAY_NAMES[language]})"
+    ylabel = LOSS_LABELS[loss]
     all_steps = []
 
     # Plot the loss for each model
@@ -202,7 +195,7 @@ def plot_model_loss(log_history_by_model: dict[str, list[dict]], loss: str, lang
         return
 
     # Add labels and formatting
-    configure_axes(ax, sorted(set(all_steps)), ylabel, title)
+    configure_axes(ax, sorted(set(all_steps)), ylabel)
 
     style.legend_below(fig, ax, ncol=len(log_history_by_model))
 
@@ -241,7 +234,6 @@ def main() -> None:
         plot_model_loss(
             log_history_by_model,
             loss,
-            args.language,
             output_path=output_dir / f"all_models_{args.language}_{loss}.pdf"
         )
 
