@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
+import style
+
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
@@ -20,10 +22,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Figure styling
-FIGURE_SIZE = (10, 6)
-LINE_WIDTH = 1.4
+FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Display name for each model, used in plot titles and legends
+# Display name for each model, used in plot legends
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -31,21 +32,20 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Colour palette, one colour per model
-PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
-
 # Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
-# Axis label and plot title for every metric alignment.py reports
+# Axis label for every metric alignment.py reports
 METRIC_LABELS = {
-    "matched_cosine_similarity": ("Cosine Similarity", "Matched Pair Cosine Similarity"),
-    "baseline_cosine_similarity": ("Cosine Similarity", "Non-Matched Baseline Cosine Similarity"),
-    "cosine_gap": ("Cosine Gap", "Cross-Lingual Alignment (Cosine Gap)"),
-    "p_at_1_english_to_target": ("P@1", "Top-1 Retrieval Accuracy (English to Target)"),
-    "p_at_1_target_to_english": ("P@1", "Top-1 Retrieval Accuracy (Target to English)"),
-    "iso_score_shared": ("IsoScore", "Isotropy of the Shared Bilingual Space")
+    "matched_cosine_similarity": "Cosine Similarity",
+    "baseline_cosine_similarity": "Cosine Similarity",
+    "cosine_gap": "Cosine Gap",
+    "p_at_1_english_to_target": "P@1",
+    "p_at_1_target_to_english": "P@1",
+    "iso_score_shared": "IsoScore"
 }
+
+DEFAULT_METRICS = ["baseline_cosine_similarity", "cosine_gap", "iso_score_shared"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -72,6 +72,14 @@ def parse_args() -> Namespace:
         default="xho_Latn",
         choices=SUPPORTED_LANGUAGES,
         help="FLORES-200 language subset the alignment results were computed on."
+    )
+    parser.add_argument(
+        "--metrics",
+        type=str,
+        nargs="+",
+        default=DEFAULT_METRICS,
+        choices=list(METRIC_LABELS),
+        help="Which metrics to plot."
     )
     parser.add_argument(
         "--output-dir",
@@ -119,23 +127,47 @@ def configure_step_axis(ax, steps: list[int]) -> None:
     :param steps: Checkpoint steps being plotted.
     """
     ax.set_xlim(min(steps), max(steps))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10, steps=[1, 2, 5, 10]))
-    ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, steps=[1, 2, 5, 10]))
+    ax.xaxis.set_major_formatter(
+        ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
+    )
 
-def configure_axes(ax, steps: list[int], ylabel: str, title: str) -> None:
+def configure_value_axis(ax) -> None:
+    """
+    Scale the metric axis from zero and end it a tick clear of the data.
+
+    :param ax: Axes to configure.
+    """
+    locator = ticker.MaxNLocator(nbins=6, steps=[1, 2, 2.5, 5, 10])
+    ax.yaxis.set_major_locator(locator)
+
+    low, high = ax.dataLim.intervaly
+    low = min(low, 0.0)
+
+    ticks = locator.tick_values(low, high)
+    step = ticks[1] - ticks[0]
+
+    # Keep a tick of headroom, unless the metric is already capped at one
+    bottom = max(t for t in ticks if t <= low)
+    top = min(t for t in ticks if t >= high)
+    if top - high < 0.25 * step:
+        top = 1.0 if high <= 1.0 else top + step
+
+    ax.set_ylim(bottom, top)
+
+def configure_axes(ax, steps: list[int], ylabel: str) -> None:
     """
     Apply labels, scales and grid styling to an alignment plot.
 
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted.
     :param ylabel: Y-axis label.
-    :param title: Plot title.
     """
     ax.set_xlabel("Continued Pretraining Step")
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
     configure_step_axis(ax, steps)
-    ax.grid(True, alpha=0.3, linestyle=":", which="both")
+    configure_value_axis(ax)
+    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -146,7 +178,7 @@ def save_figure(fig, output_path: Path, description: str) -> None:
     :param description: Short description of the plot, used in the log message.
     """
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    fig.savefig(output_path)
     plt.close(fig)
 
     logger.info(f"Saved {description} plot to {output_path}")
@@ -162,23 +194,21 @@ def plot_model_metric(alignment_by_model: dict[str, dict[int, dict]], metric: st
     """
     fig, ax = plt.subplots(figsize=FIGURE_SIZE)
 
-    ylabel, title = METRIC_LABELS[metric]
     all_steps = []
 
     # Plot the metric for each model
-    for i, (model, alignment_by_step) in enumerate(alignment_by_model.items()):
+    for model, alignment_by_step in alignment_by_model.items():
         steps = sorted(alignment_by_step.keys())
         all_steps.extend(steps)
 
         values = metric_series(alignment_by_step, steps, metric)
-        color = PALETTE[i % len(PALETTE)]
 
-        ax.plot(steps, values, label=MODEL_DISPLAY_NAMES[model], linewidth=LINE_WIDTH, color=color)
+        ax.plot(steps, values, label=MODEL_DISPLAY_NAMES[model])
 
     # Add labels and formatting
-    configure_axes(ax, sorted(set(all_steps)), ylabel, title)
+    configure_axes(ax, sorted(set(all_steps)), METRIC_LABELS[metric])
 
-    ax.legend(loc="best", fontsize=9)
+    style.legend_below(fig, ax, ncol=min(len(alignment_by_model), 4))
 
     save_figure(fig, output_path, f"all-models {metric}")
 
@@ -213,11 +243,11 @@ def main() -> None:
         return
 
     # Plot every metric for all models, one figure per metric
-    for metric in METRIC_LABELS:
+    for metric in args.metrics:
         plot_model_metric(
             alignment_by_model,
             metric,
-            output_path=output_dir / f"all_models_{args.language}_{metric}.png"
+            output_path=output_dir / f"all_models_{args.language}_{metric}.pdf"
         )
 
 if __name__ == "__main__":

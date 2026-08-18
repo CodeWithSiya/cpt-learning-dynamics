@@ -4,7 +4,7 @@ import os
 import shutil
 
 import matplotlib.pyplot as plt
-import scienceplots 
+import scienceplots
 from cycler import cycler
 
 # Figure widths in inches, measured from acmart's sigconf layout
@@ -109,6 +109,7 @@ def legend_below(fig, ax, ncol: int) -> None:
     :param ncol: Number of legend columns.
     """
     handles, labels = ax.get_legend_handles_labels()
+
     fig.legend(
         handles,
         labels,

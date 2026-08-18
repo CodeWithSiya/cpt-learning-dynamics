@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
+import style
+
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
@@ -20,10 +22,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Figure styling
-FIGURE_SIZE = (10, 6)
-LINE_WIDTH = 1.4
+FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Display name for each model, used in plot titles and legends
+# Display name for each model, used in plot legends
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -31,21 +32,21 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Colour palette, one colour per model
-PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
-
-# Axis label and title fragment for every metric layerwise.py reports
-METRIC_LABELS = {
-    "matched_cosine_similarity": ("Cosine Similarity", "Matched Pair Cosine Similarity"),
-    "baseline_cosine_similarity": ("Cosine Similarity", "Non-Matched Baseline Cosine Similarity"),
-    "cosine_gap": ("Cosine Gap", "Cross-Lingual Alignment (Cosine Gap)"),
-    "p_at_1_english_to_target": ("P@1", "Top-1 Retrieval Accuracy (English to Target)"),
-    "p_at_1_target_to_english": ("P@1", "Top-1 Retrieval Accuracy (Target to English)"),
-    "iso_score_shared": ("IsoScore", "Isotropy of the Shared Bilingual Space")
-}
-
 # Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
+
+# Axis label for every metric layerwise.py reports
+METRIC_LABELS = {
+    "matched_cosine_similarity": "Cosine Similarity",
+    "baseline_cosine_similarity": "Cosine Similarity",
+    "cosine_gap": "Cosine Gap",
+    "p_at_1_english_to_target": "P@1",
+    "p_at_1_target_to_english": "P@1",
+    "iso_score_shared": "IsoScore"
+}
+
+# Metrics plotted unless --metrics asks for others
+DEFAULT_METRICS = ["baseline_cosine_similarity", "cosine_gap", "iso_score_shared"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -77,9 +78,9 @@ def parse_args() -> Namespace:
         "--metrics",
         type=str,
         nargs="+",
-        default=list(METRIC_LABELS),
+        default=DEFAULT_METRICS,
         choices=list(METRIC_LABELS),
-        help="Which layer-wise metrics to plot. Defaults to every metric."
+        help="Which metrics to plot."
     )
     parser.add_argument(
         "--output-dir",
@@ -130,22 +131,41 @@ def layer_positions(num_values: int, relative: bool) -> np.ndarray:
 
     return layers
 
-def configure_axes(ax, metric: str, title: str) -> None:
+def configure_value_axis(ax) -> None:
+    """
+    Scale the metric axis from zero and end it a tick clear of the data.
+
+    :param ax: Axes to configure.
+    """
+    locator = ticker.MaxNLocator(nbins=6, steps=[1, 2, 2.5, 5, 10])
+    ax.yaxis.set_major_locator(locator)
+
+    low, high = ax.dataLim.intervaly
+    low = min(low, 0.0)
+
+    ticks = locator.tick_values(low, high)
+    step = ticks[1] - ticks[0]
+
+    # Keep a tick of headroom, unless the metric is already capped at one
+    bottom = max(t for t in ticks if t <= low)
+    top = min(t for t in ticks if t >= high)
+    if top - high < 0.25 * step:
+        top = 1.0 if high <= 1.0 else top + step
+
+    ax.set_ylim(bottom, top)
+
+def configure_axes(ax, metric: str) -> None:
     """
     Apply labels, limits and grid styling to a layer-wise plot.
 
     :param ax: Axes to configure.
     :param metric: Metric being plotted, used for the y-axis label.
-    :param title: Plot title.
     """
-    ylabel, _ = METRIC_LABELS[metric]
-
     ax.set_xlabel("Layer")
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    ax.set_ylabel(METRIC_LABELS[metric])
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-
-    ax.grid(True, alpha=0.3, linestyle=":", which="both")
+    configure_value_axis(ax)
+    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -156,7 +176,7 @@ def save_figure(fig, output_path: Path, description: str) -> None:
     :param description: Short description of the plot, used in the log message.
     """
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    fig.savefig(output_path)
     plt.close(fig)
 
     logger.info(f"Saved {description} plot to {output_path}")
@@ -182,20 +202,12 @@ def plot_model_layerwise(model: str, layerwise_by_step: dict[int, dict], metric:
             logger.warning(f"No '{metric}' values for '{model}' at step {step}, skipping.")
             continue
 
-        ax.plot(
-            layer_positions(values.size, relative=False),
-            values,
-            label=f"step {step:,}",
-            linewidth=LINE_WIDTH,
-        )
+        label = f"{step / 1000:g}k" if step >= 1000 else f"{step}"
+        ax.plot(layer_positions(values.size, relative=False), values, label=label)
 
-    _, title = METRIC_LABELS[metric]
-    configure_axes(
-        ax,
-        metric,
-        f"{title} by Layer ({MODEL_DISPLAY_NAMES[model]})",
-    )
-    ax.legend(loc="best", fontsize=9, title="Checkpoint")
+    configure_axes(ax, metric)
+
+    style.legend_below(fig, ax, ncol=min(len(steps), 4))
 
     save_figure(fig, output_path, f"{model} layer-wise {metric}")
 
@@ -235,7 +247,7 @@ def main() -> None:
                 model,
                 layerwise_by_step,
                 metric,
-                output_path=output_dir / f"{model}_{args.language}_layerwise_{metric}.png"
+                output_path=output_dir / f"{model}_{args.language}_layerwise_{metric}.pdf"
             )
 
 if __name__ == "__main__":
