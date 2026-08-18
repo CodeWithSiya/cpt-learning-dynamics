@@ -53,9 +53,9 @@ else
     LANGUAGES=("${ALL_LANGUAGES[@]}")
 fi
 
-# Plot layer-wise alignment profiles, for every metric
+# Plot layer-wise alignment profiles
 for language in "${LANGUAGES[@]}"; do
-    echo "=== Plotting layer-wise profiles for ${MODELS[@]} (${language}) ==="
+    echo "=== Plotting layer-wise alignment profiles for ${MODELS[@]} (${language}) ==="
 
     uv run python src/visualisation/plot_layerwise.py \
         --results-dir ${SCRATCH}/cpt-learning-dynamics/results \
