@@ -17,6 +17,7 @@ from transformers import (
     logging as hf_logging
 )
 
+import style
 from src.evaluation.embeddings import (
     DEFAULT_BATCH_SIZE,
     PIVOT_LANGUAGE,
@@ -24,20 +25,17 @@ from src.evaluation.embeddings import (
     embed_sentences
 )
 
-# Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Constant Values
 IS_GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if IS_GPU_AVAILABLE else "cpu")
 RANDOM_SEED = 42
 GRID_COLUMNS = 5
 
-# Supported target languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
@@ -103,12 +101,10 @@ def discover_checkpoints(checkpoint_dir: Path) -> list[Path]:
     """
     checkpoints = []
 
-    # Search for checkpoint directories that begin with 'step-'
     for path in checkpoint_dir.iterdir():
         if path.is_dir() and path.name.startswith("step-"):
             checkpoints.append(path)
 
-    # Sort the checkpoints by step numbers
     checkpoints.sort(key=checkpoint_step)
 
     return checkpoints
@@ -125,11 +121,9 @@ def compute_tsne_projection(english_embeddings: np.ndarray, target_embeddings: n
     # Combine both languages so t-SNE projects them into a shared 2D space
     combined = np.vstack([english_embeddings, target_embeddings])
 
-    # Fit t-SNE to the combined embeddings and project them into 2D
     tsne = TSNE(n_components=2, random_state=RANDOM_SEED, perplexity=30)
     projected = tsne.fit_transform(combined)
 
-    # Seperate the projected coordinates back into English and target-language embeddings
     n = len(english_embeddings)
     return projected[:n], projected[n:]
 
@@ -145,7 +139,6 @@ def plot_tsne_grid(projections_by_step: dict[int, tuple[np.ndarray, np.ndarray]]
     steps = sorted(projections_by_step.keys())
     num_checkpoints = len(steps)
 
-    # Arrange checkpoints in a grid with a fixed number of columns
     num_cols = GRID_COLUMNS
     num_rows = (num_checkpoints + num_cols - 1) // num_cols
 
@@ -155,27 +148,22 @@ def plot_tsne_grid(projections_by_step: dict[int, tuple[np.ndarray, np.ndarray]]
         row, col = divmod(index, num_cols)
         ax = axes[row][col]
 
-        # Retrieve the English and target-language 2D projections for this checkpoint
         english_2d, target_2d = projections_by_step[step]
 
-        # Plot the English and target-language embeddings
-        ax.scatter(english_2d[:, 0], english_2d[:, 1], color="cornflowerblue", alpha=0.6, s=8, label="English")
-        ax.scatter(target_2d[:, 0], target_2d[:, 1], color="lightcoral", alpha=0.6, s=8, label=f"{language}")
+        ax.scatter(english_2d[:, 0], english_2d[:, 1], color=style.PALETTE[0], alpha=0.6, s=8, label="English")
+        ax.scatter(target_2d[:, 0], target_2d[:, 1], color=style.PALETTE[1], alpha=0.6, s=8, label=f"{language}")
 
         ax.set_title(f"step-{step}", fontsize=9)
         ax.set_xticks([])
         ax.set_yticks([])
 
-    # Hide any unused subplots in the grid
     for idx in range(num_checkpoints, num_rows * num_cols):
         row, col = divmod(idx, num_cols)
         axes[row][col].axis("off")
 
-    # Shared legend for the whole figure
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right", fontsize=9)
 
-    # Write the figure to disk and close it
     fig.tight_layout()
     fig.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -195,14 +183,12 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Discover all CPT checkpoints
     checkpoints = discover_checkpoints(checkpoint_dir)
     logger.info(f"Found {len(checkpoints)} checkpoints in {checkpoint_dir}")
 
     if not checkpoints:
         raise ValueError(f"No 'step-' checkpoint directories found in {checkpoint_dir}.")
 
-    # Load FLORES-200 parallel sentences
     english_sentences, target_sentences = load_flores_pairs(flores_pairs_dir, args.language)
 
     # Limit to a subset of sentences for readability
@@ -215,24 +201,20 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(checkpoints[0])
     hf_logging.set_verbosity_warning()
 
-    # Compute a t-SNE projection for every checkpoint
     projections_by_step = {}
 
     for checkpoint_path in checkpoints:
         step = checkpoint_step(checkpoint_path)
         logger.info(f"Computing t-SNE embeddings for {checkpoint_path.name}...")
 
-        # Load the base encoder for this checkpoint
         hf_logging.set_verbosity_error()
         model = AutoModel.from_pretrained(checkpoint_path).to(DEVICE)
         model.eval()
         hf_logging.set_verbosity_warning()
 
-        # Compute contextual, mean-pooled embeddings for each language
         english_embeddings = embed_sentences(english_subset, model, tokenizer, DEVICE, args.batch_size)
         target_embeddings = embed_sentences(target_subset, model, tokenizer, DEVICE, args.batch_size)
 
-        # Compute 2D t-SNE projections for both sets of embeddings
         projections_by_step[step] = compute_tsne_projection(english_embeddings, target_embeddings)
 
         # Free GPU memory before loading the next checkpoint
@@ -240,11 +222,9 @@ def main() -> None:
         if IS_GPU_AVAILABLE:
             torch.cuda.empty_cache()
 
-    # Build the output filename from the model name and language
     filename = args.model_name.lower().replace(" ", "_").replace("-", "_")
     output_path = output_dir / f"{filename}_{args.language}_tsne_grid.png"
 
-    # Plot all checkpoints' projections as a single grid figure
     plot_tsne_grid(projections_by_step, args.model_name, args.language, output_path)
 
 if __name__ == "__main__":

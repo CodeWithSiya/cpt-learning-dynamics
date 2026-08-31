@@ -13,17 +13,14 @@ import matplotlib.ticker as ticker
 
 import style
 
-# Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Figure styling
 FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Display name for each model
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -31,10 +28,8 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Supported languages
 SUPPORTED_LANGUAGES = ["xho", "zul"]
 
-# Axis label for every loss the trainer logs
 LOSS_LABELS = {
     "loss": "Training Loss",
     "eval_loss": "Validation Loss"
@@ -148,7 +143,6 @@ def configure_axes(ax, steps: list[int], ylabel: str) -> None:
     ax.set_ylabel(ylabel)
     configure_step_axis(ax, steps)
     configure_value_axis(ax)
-    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -178,7 +172,6 @@ def plot_model_loss(log_history_by_model: dict[str, list[dict]], loss: str,
     ylabel = LOSS_LABELS[loss]
     all_steps = []
 
-    # Plot the loss for each model
     for model, log_history in log_history_by_model.items():
         steps, values = loss_series(log_history, loss)
 
@@ -194,7 +187,6 @@ def plot_model_loss(log_history_by_model: dict[str, list[dict]], loss: str,
         plt.close(fig)
         return
 
-    # Add labels and formatting
     configure_axes(ax, sorted(set(all_steps)), ylabel)
 
     style.legend_below(fig, ax, ncol=len(log_history_by_model))
@@ -209,7 +201,6 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load the log history for every model that has been continually pretrained
     log_history_by_model = {}
 
     for model in args.models:
@@ -229,7 +220,6 @@ def main() -> None:
         logger.error(f"No log histories found in {results_dir}")
         return
 
-    # Plot every loss for all models, one figure per loss
     for loss in LOSS_LABELS:
         plot_model_loss(
             log_history_by_model,

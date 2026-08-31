@@ -12,18 +12,15 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-# Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Figure styling
 FIGURE_SIZE = (10, 6)
 LINE_WIDTH = 1.4
 
-# Display name for each model, used in plot titles and legends
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -31,10 +28,8 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Colour palette, one colour per model
-PALETTE = ["lightcoral", "cornflowerblue", "lightgreen", "sandybrown"]
+PALETTE = style.PALETTE
 
-# Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
@@ -81,7 +76,6 @@ def load_perplexity_results(path: Path) -> dict[int, dict]:
     with open(path) as f:
         raw = json.load(f)
 
-     # Load results and convert JSON keys to integers
     results = {int(step): data for step, data in raw.items()}
     logger.info(f"Loaded perplexity results for {len(results)} checkpoints from {path.name}.")
     return results
@@ -152,9 +146,8 @@ def plot_perplexity_dynamics(perplexity_by_step: dict[int, dict], model_name: st
     steps = sorted(perplexity_by_step.keys())
     pppl = perplexity_series(perplexity_by_step, steps)
 
-    ax.plot(steps, pppl, linewidth=LINE_WIDTH, color="cornflowerblue")
+    ax.plot(steps, pppl, linewidth=LINE_WIDTH, color=style.PALETTE[0])
 
-    # Add labels and formatting
     configure_axes(ax, steps, f"Pseudo-Perplexity Dynamics ({model_name})")
 
     save_figure(fig, output_path, f"{model_name} pseudo-perplexity")
@@ -170,7 +163,6 @@ def plot_model_perplexity(perplexity_by_model: dict[str, dict[int, dict]], outpu
 
     all_steps = []
 
-    # Plot the pseudo-perplexity for each model
     for i, (model, perplexity_by_step) in enumerate(perplexity_by_model.items()):
         steps = sorted(perplexity_by_step.keys())
         all_steps.extend(steps)
@@ -180,7 +172,6 @@ def plot_model_perplexity(perplexity_by_model: dict[str, dict[int, dict]], outpu
 
         ax.plot(steps, pppl, label=MODEL_DISPLAY_NAMES[model], linewidth=LINE_WIDTH, color=color)
 
-    # Add labels and formatting
     configure_axes(ax, sorted(set(all_steps)), "Pseudo-Perplexity Dynamics")
     ax.legend(loc="upper right", fontsize=9)
 
@@ -197,7 +188,6 @@ def main() -> None:
     # Results are stored under the ISO 639-3 code of the CPT language
     language = args.language.split("_")[0]
 
-    # Load the perplexity results for every model that has been evaluated
     perplexity_by_model = {}
 
     for model in args.models:
@@ -217,12 +207,10 @@ def main() -> None:
         logger.error(f"No perplexity results found in {results_dir}")
         return
 
-    # Plot pseudo-perplexity dynamics
     for model, perplexity_by_step in perplexity_by_model.items():
         model_name = MODEL_DISPLAY_NAMES[model]
         filename = model_name.lower().replace(" ", "_").replace("-", "_")
 
-        # Save each model's plot alongside its other plots
         model_plots_dir = results_dir / f"{model}-large" / language / "plots"
         model_plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -232,7 +220,6 @@ def main() -> None:
             output_path=model_plots_dir / f"{filename}_{args.language}_perplexity.png"
         )
 
-    # Plot pseudo-perplexity for all models on a single figure
     if len(perplexity_by_model) < 2:
         logger.info("Fewer than two models plotted, skipping the all-models overview.")
         return

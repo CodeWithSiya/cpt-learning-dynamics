@@ -14,17 +14,14 @@ import numpy as np
 
 import style
 
-# Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Figure styling
 FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Display name for each model, used in plot legends
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -32,10 +29,8 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
-# Axis label for every metric layerwise.py reports
 METRIC_LABELS = {
     "matched_cosine_similarity": "Cosine Similarity",
     "baseline_cosine_similarity": "Cosine Similarity",
@@ -45,7 +40,6 @@ METRIC_LABELS = {
     "iso_score_shared": "IsoScore"
 }
 
-# Metrics plotted unless --metrics asks for others
 DEFAULT_METRICS = ["baseline_cosine_similarity", "cosine_gap", "iso_score_shared"]
 
 def parse_args() -> Namespace:
@@ -100,7 +94,6 @@ def load_layerwise_results(path: Path) -> dict[int, dict]:
     with open(path) as f:
         raw = json.load(f)
 
-    # Load results and convert JSON keys to integers
     results = {int(step): data for step, data in raw.items()}
     logger.info(f"Loaded layer-wise results for {len(results)} checkpoints from {path.name}.")
     return results
@@ -165,7 +158,6 @@ def configure_axes(ax, metric: str) -> None:
     ax.set_ylabel(METRIC_LABELS[metric])
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     configure_value_axis(ax)
-    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -221,7 +213,6 @@ def main() -> None:
 
     language = args.language.split("_")[0]
 
-    # Load the layer-wise results for every model that has been evaluated
     layerwise_by_model = {}
 
     for model in args.models:
