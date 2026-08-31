@@ -28,6 +28,14 @@ TASK_DISPLAY_NAMES = {
 
 VALUE_LABEL = "Macro F1"
 
+CLASS_DISPLAY_NAMES = {
+    "Ezemidlalo": "Sports",
+    "Ezezimoto": "Motoring",
+    "Ezokungcebeleka": "Entertainment",
+    "Imibono": "Opinion",
+    "Intandokazi": "Lifestyle",
+}
+
 POS_GROUPS = {
     "Nouns": ["NOUN", "PROPN"],
     "Verbs": ["VERB", "AUX"],
@@ -190,7 +198,7 @@ def plot_by_task(aggregated, models, languages, tasks, output_path: Path) -> Non
                 )
                 style.configure_step_axis(ax, steps)
 
-        style.configure_row_value_axis(axes[row])
+    style.configure_value_axis(axes.flat)
 
     style.label_grid(
         axes,
@@ -237,7 +245,7 @@ def plot_overall(aggregated, models, languages, tasks, output_path: Path) -> Non
                 )
                 style.configure_step_axis(ax, steps)
 
-        style.configure_row_value_axis(axes[row])
+    style.configure_value_axis(axes.flat)
 
     style.label_grid(
         axes,
@@ -252,6 +260,18 @@ def plot_overall(aggregated, models, languages, tasks, output_path: Path) -> Non
         row_labels=[style.LANGUAGE_DISPLAY_NAMES[language] for language in languages],
     )
     logger.info(f"Saved downstream overall grid to {output_path}")
+
+def class_label(class_name: str) -> str:
+    """
+    Resolve a class to its display label, translating isiZulu NTC categories.
+
+    :param class_name: Class as it appears in the aggregated results.
+    :return: Label to show in the legend.
+    """
+    if class_name in CLASS_DISPLAY_NAMES:
+        return CLASS_DISPLAY_NAMES[class_name]
+
+    return class_name if class_name.isupper() else class_name.capitalize()
 
 def group_of(class_name: str) -> str:
     """
@@ -333,7 +353,7 @@ def plot_grouped(aggregated, models, languages, task: str, output_path: Path) ->
 
             style.configure_step_axis(ax, steps)
 
-        style.configure_row_value_axis(axes[row])
+    style.configure_value_axis(axes.flat)
 
     style.label_grid(
         axes,
@@ -372,7 +392,10 @@ def plot_per_class(aggregated, models, languages, task: str, output_path: Path) 
         logger.warning(f"No per-class results for '{task}', skipping that figure.")
         return
 
-    colours = dict(zip(class_names, style.categorical_colours(len(class_names))))
+    # Colour by display label, so a category shared by both languages under
+    # different names keeps one colour and one legend entry
+    labels = sorted({class_label(class_name) for class_name in class_names})
+    colours = dict(zip(labels, style.categorical_colours(len(labels))))
 
     fig, axes = style.grid_figure(len(languages), len(models), row_labels=True)
 
@@ -391,11 +414,12 @@ def plot_per_class(aggregated, models, languages, task: str, output_path: Path) 
                 if np.isnan(values).all():
                     continue
 
-                ax.plot(steps, values, label=class_name, color=colours[class_name])
+                label = class_label(class_name)
+                ax.plot(steps, values, label=label, color=colours[label])
 
             style.configure_step_axis(ax, steps)
 
-        style.configure_row_value_axis(axes[row])
+    style.configure_value_axis(axes.flat)
 
     style.label_grid(
         axes,

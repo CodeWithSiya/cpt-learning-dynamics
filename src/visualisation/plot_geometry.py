@@ -200,9 +200,14 @@ def plot_layerwise(layerwise, models, languages, metrics, output_path: Path) -> 
                 )
 
             ax.set_xlim(0, max(ax.get_xlim()[1], 1))
-            ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=4, integer=True))
+            ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3, integer=True))
 
-        style.configure_row_value_axis(axes[row])
+    for metric in metrics:
+        style.configure_value_axis([
+            ax
+            for row, (row_metric, _) in enumerate(rows) if row_metric == metric
+            for ax in axes[row]
+        ])
 
     style.label_grid(
         axes,
@@ -250,7 +255,7 @@ def plot_checkpoints(alignment, models, languages, metrics, output_path: Path) -
                 )
                 style.configure_step_axis(ax, steps)
 
-        style.configure_row_value_axis(axes[row])
+        style.configure_value_axis(axes[row])
 
     style.label_grid(
         axes,
