@@ -14,17 +14,14 @@ import numpy as np
 
 import style
 
-# Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Figure styling
 FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Display name for each model, used in plot legends
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLMR",
@@ -32,10 +29,8 @@ MODEL_DISPLAY_NAMES = {
     "afriberta": "AfriBERTa"
 }
 
-# Supported languages
 SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
-# Axis label for every metric alignment.py reports
 METRIC_LABELS = {
     "matched_cosine_similarity": "Cosine Similarity",
     "baseline_cosine_similarity": "Cosine Similarity",
@@ -99,7 +94,6 @@ def load_alignment_results(path: Path) -> dict[int, dict]:
     with open(path) as f:
         raw = json.load(f)
 
-    # Load results and convert JSON keys to integers
     results = {int(step): data for step, data in raw.items()}
     logger.info(f"Loaded alignment results for {len(results)} checkpoints from {path.name}.")
     return results
@@ -167,7 +161,6 @@ def configure_axes(ax, steps: list[int], ylabel: str) -> None:
     ax.set_ylabel(ylabel)
     configure_step_axis(ax, steps)
     configure_value_axis(ax)
-    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -196,7 +189,6 @@ def plot_model_metric(alignment_by_model: dict[str, dict[int, dict]], metric: st
 
     all_steps = []
 
-    # Plot the metric for each model
     for model, alignment_by_step in alignment_by_model.items():
         steps = sorted(alignment_by_step.keys())
         all_steps.extend(steps)
@@ -205,7 +197,6 @@ def plot_model_metric(alignment_by_model: dict[str, dict[int, dict]], metric: st
 
         ax.plot(steps, values, label=MODEL_DISPLAY_NAMES[model])
 
-    # Add labels and formatting
     configure_axes(ax, sorted(set(all_steps)), METRIC_LABELS[metric])
 
     style.legend_below(fig, ax, ncol=min(len(alignment_by_model), 4))
@@ -222,7 +213,6 @@ def main() -> None:
 
     language = args.language.split("_")[0]
 
-    # Load the alignment results for every model that has been evaluated
     alignment_by_model = {}
 
     for model in args.models:
@@ -242,7 +232,6 @@ def main() -> None:
         logger.error(f"No alignment results found in {results_dir}")
         return
 
-    # Plot every metric for all models, one figure per metric
     for metric in args.metrics:
         plot_model_metric(
             alignment_by_model,

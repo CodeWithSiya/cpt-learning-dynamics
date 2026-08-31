@@ -14,17 +14,14 @@ import matplotlib.ticker as ticker
 
 import style
 
-# Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Figure styling
 FIGURE_SIZE = style.figure_size(style.COLUMN_WIDTH)
 
-# Evaluation metric for each task
 TASK_METRICS = {
     "ner": "f1",
     "pos": "f1",
@@ -32,7 +29,6 @@ TASK_METRICS = {
     "ntc_zul": "f1"
 }
 
-# Display name for each task, used in plot legends
 TASK_DISPLAY_NAMES = {
     "ner": "NER",
     "pos": "POS",
@@ -75,7 +71,6 @@ def load_aggregated_results(path: Path) -> dict[int, dict]:
     with open(path) as f:
         raw = json.load(f)
 
-    # Load aggregated results and convert JSON keys to integers
     aggregated = {int(step): data for step, data in raw.items()}
     logger.info(f"Loaded aggregated results for {len(aggregated)} checkpoints from {path.name}.")
     return aggregated
@@ -137,7 +132,6 @@ def configure_axes(ax, steps: list[int]) -> None:
     ax.set_ylabel("Macro F1")
     configure_step_axis(ax, steps)
     configure_value_axis(ax)
-    ax.grid(True)
 
 def save_figure(fig, output_path: Path, description: str) -> None:
     """
@@ -165,18 +159,15 @@ def plot_per_class_dynamics(aggregated: dict[int, dict], task: str, output_path:
 
     steps = sorted(aggregated.keys())
 
-    # Collect all classes across checkpoints
     class_names = set()
     for step_data in aggregated.values():
         class_names.update(step_data["per_class_mean"].keys())
 
-    # Plot the mean F1 for each class
     for class_name in sorted(class_names):
         means = metric_series([aggregated[s]["per_class_mean"].get(class_name) for s in steps])
 
         ax.plot(steps, means, label=class_name)
 
-    # Add labels and formatting
     configure_axes(ax, steps)
 
     style.legend_below(fig, ax, ncol=min(len(class_names), 4))
@@ -194,7 +185,6 @@ def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], output_p
 
     all_steps = []
 
-    # Plot the mean F1 for each task
     for task, aggregated in aggregated_by_task.items():
         steps = sorted(aggregated.keys())
         all_steps.extend(steps)
@@ -203,7 +193,6 @@ def plot_model_dynamics(aggregated_by_task: dict[str, dict[int, dict]], output_p
 
         ax.plot(steps, means, label=TASK_DISPLAY_NAMES[task])
 
-    # Add labels and formatting
     configure_axes(ax, sorted(set(all_steps)))
 
     style.legend_below(fig, ax, ncol=len(aggregated_by_task))
@@ -218,7 +207,6 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load the aggregated results for every task that has been aggregated
     aggregated_by_task = {}
 
     for task in TASK_METRICS:
@@ -240,7 +228,6 @@ def main() -> None:
 
     filename = args.model_name.lower().replace(" ", "_").replace("-", "_")
 
-    # Plot per-class learning dynamics, one figure per task
     for task, aggregated in aggregated_by_task.items():
         plot_per_class_dynamics(
             aggregated,
@@ -248,7 +235,6 @@ def main() -> None:
             output_path=output_dir / f"{filename}_{task}_per_class.pdf"
         )
 
-    # Plot overall learning dynamics for all tasks on a single figure
     plot_model_dynamics(
         aggregated_by_task,
         output_path=output_dir / f"{filename}_overall.pdf"

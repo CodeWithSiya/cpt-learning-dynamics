@@ -11,14 +11,14 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-# Configure logging to show timestamps and log level
+import style
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Constant Values
 GRID_COLUMNS = 5
 
 def parse_args() -> Namespace:
@@ -73,7 +73,6 @@ def load_checkpoint_results(results_dir: Path, task: str, seed: int):
     """
     results_by_step = {}
 
-    # Iterate through checkpoints in ascending step order
     for step_dir in sorted(results_dir.glob("step-*"), key=checkpoint_step):
         results_path = step_dir / task / f"seed-{seed}" / "results.json"
 
@@ -100,7 +99,6 @@ def plot_finetune_grid(results_by_step: dict[int, list[dict]], task: str, model_
     steps = sorted(results_by_step.keys())
     num_checkpoints = len(steps)
 
-    # Arrange checkpoints in a grid with a fixed number of columns
     num_cols = GRID_COLUMNS
     num_rows = (num_checkpoints + num_cols - 1) // num_cols
 
@@ -112,35 +110,31 @@ def plot_finetune_grid(results_by_step: dict[int, list[dict]], task: str, model_
 
         log_history = results_by_step[step]
 
-        # Collect training and validation losses for this checkpoint's fine-tuning run
         train_points = [(entry["epoch"], entry["loss"]) for entry in log_history if "loss" in entry]
         eval_points = [(entry["epoch"], entry["eval_loss"]) for entry in log_history if "eval_loss" in entry]
 
         if train_points:
             train_epochs, train_values = zip(*train_points)
-            ax.plot(train_epochs, train_values, color="cornflowerblue", label="Train")
+            ax.plot(train_epochs, train_values, color=style.PALETTE[0], label="Train")
 
         if eval_points:
             eval_epochs, eval_values = zip(*eval_points)
-            ax.plot(eval_epochs, eval_values, color="lightcoral", label="Val")
+            ax.plot(eval_epochs, eval_values, color=style.PALETTE[1], label="Val")
 
         ax.set_title(f"step-{step}", fontsize=9)
         ax.tick_params(labelsize=7)
         ax.grid(True, linestyle="--", alpha=0.4)
 
-    # Hide any unused subplots in the grid
     for idx in range(num_checkpoints, num_rows * num_cols):
         row, col = divmod(idx, num_cols)
         axes[row][col].axis("off")
 
-    # Shared legend and labels for the whole figure
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right", fontsize=9)
     fig.supxlabel("Epoch")
     fig.supylabel("Loss")
     fig.suptitle(f"Fine-tuning Loss per Checkpoint: {model_name} ({task.upper()})", fontsize=13)
 
-    # Write the figure to disk and close it
     fig.tight_layout()
     fig.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
