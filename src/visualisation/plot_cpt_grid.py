@@ -119,7 +119,9 @@ def plot_grid(log_histories, models, languages, output_path: Path) -> None:
     :param languages: Languages to draw as rows.
     :param output_path: File path to save the figure to.
     """
-    fig, axes = style.grid_figure(len(languages), len(LOSS_TYPES), row_labels=True)
+    fig, axes = style.grid_figure(
+        len(languages), len(LOSS_TYPES), row_labels=True, sharey="col"
+    )
 
     for row, language in enumerate(languages):
         for col, loss_type in enumerate(LOSS_TYPES):
@@ -147,7 +149,8 @@ def plot_grid(log_histories, models, languages, output_path: Path) -> None:
             if all_steps:
                 configure_step_axis(ax, sorted(set(all_steps)))
 
-    style.configure_value_axis(axes.flat, cap_at_one=False)
+    for col in range(len(LOSS_TYPES)):
+        style.configure_value_axis(axes[:, col], cap_at_one=False)
 
     style.label_grid(
         axes,
