@@ -12,8 +12,7 @@ from cycler import cycler
 COLUMN_WIDTH = 3.335
 TEXT_WIDTH = 7.03
 
-PANEL_WIDTH = (TEXT_WIDTH - 0.62) / 4
-PANEL_ASPECT = 0.80
+PANEL_HEIGHT = 1.28
 ROW_LABEL_WIDTH = 0.62
 
 PALETTE = [
@@ -60,7 +59,7 @@ plt.rcParams.update({
     "axes.edgecolor": MUTED_INK,
     "axes.labelcolor": INK,
     "text.color": INK,
-    "lines.linewidth": 1.3,
+    "lines.linewidth": 1.1,
     "lines.solid_capstyle": "round",
     "axes.grid": False,
     "xtick.color": MUTED_INK,
@@ -190,8 +189,8 @@ def balanced_ncol(n: int, max_cols: int) -> int:
 def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
                 sharex: bool | str = True, sharey: bool | str = "row"):
     """
-    Create a panel grid. Panels are the same size in every figure, so the figure
-    width follows from the column count rather than being fixed to the text width.
+    Create a panel grid. Every figure spans the text width and every panel row is
+    the same height, so figures need no rescaling to sit side by side in the paper.
 
     :param nrows: Number of panel rows.
     :param ncols: Number of panel columns.
@@ -200,8 +199,8 @@ def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
     :param sharey: Axis sharing for the y axis, e.g. "row", "col", True or False.
     :return: The figure and its 2D array of axes.
     """
-    width = ncols * PANEL_WIDTH + (ROW_LABEL_WIDTH if row_labels else 0.0)
-    height = nrows * (PANEL_WIDTH * PANEL_ASPECT + 0.35)
+    width = TEXT_WIDTH
+    height = nrows * (PANEL_HEIGHT + 0.35)
 
     fig, axes = plt.subplots(
         nrows,
@@ -388,41 +387,42 @@ def configure_step_axis(ax, steps) -> None:
     import matplotlib.ticker as ticker
 
     ax.set_xlim(min(steps), max(steps))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=4, steps=[1, 2, 5, 10]))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3, steps=[1, 2, 5, 10]))
     ax.xaxis.set_major_formatter(
         ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
     )
 
-def configure_row_value_axis(row_axes, cap_at_one: bool = True) -> None:
+def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
     """
-    Give every panel in a row one common y scale, running from zero (or below,
-    for metrics that go negative) to a tick clear of the highest value in the row.
+    Give every panel plotting the same quantity one common y scale, fitted to the
+    data rather than anchored at zero, so variation fills the panel.
 
-    :param row_axes: The axes making up a single grid row.
+    :param group_axes: Axes sharing a quantity, across rows as well as columns.
     :param cap_at_one: Whether the metric cannot exceed one, as F1 and cosine cannot.
     """
     import matplotlib.ticker as ticker
 
-    drawn = [ax for ax in row_axes if ax.has_data()]
+    group_axes = list(group_axes)
+    drawn = [ax for ax in group_axes if ax.has_data()]
     if not drawn:
         return
 
-    low = min(0.0, min(ax.dataLim.intervaly[0] for ax in drawn))
+    low = min(ax.dataLim.intervaly[0] for ax in drawn)
     high = max(ax.dataLim.intervaly[1] for ax in drawn)
 
-    locator = ticker.MaxNLocator(nbins=5, steps=[1, 2, 2.5, 5, 10])
-    ticks = locator.tick_values(low, high)
-    step = ticks[1] - ticks[0]
+    pad = 0.08 * (high - low) if high > low else 0.05
+    locator = ticker.MaxNLocator(nbins=4, steps=[1, 2, 2.5, 5, 10])
+    ticks = locator.tick_values(low - pad, high + pad)
 
-    bottom = max(t for t in ticks if t <= low)
-    top = min(t for t in ticks if t >= high)
+    bottom = max([t for t in ticks if t <= low - pad] or [ticks[0]])
+    top = min([t for t in ticks if t >= high + pad] or [ticks[-1]])
 
-    if top - high < 0.25 * step:
-        top += step
+    if low >= 0.0:
+        bottom = max(bottom, 0.0)
 
     if cap_at_one:
         top = min(top, 1.0)
 
-    for ax in row_axes:
+    for ax in group_axes:
         ax.yaxis.set_major_locator(locator)
         ax.set_ylim(bottom, top)

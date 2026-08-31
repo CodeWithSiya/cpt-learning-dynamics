@@ -1,9 +1,5 @@
 """
 Plot CPT training and validation loss as a panel grid spanning languages and loss types.
-
-One figure is produced:
-
-  * cpt_grid       2 x 2, rows = language, columns = loss type, one line per model.
 """
 
 import argparse
@@ -109,7 +105,7 @@ def configure_step_axis(ax, steps: list[int]) -> None:
     :param steps: Checkpoint steps being plotted.
     """
     ax.set_xlim(min(steps), max(steps))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=4, steps=[1, 2, 5, 10]))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3, steps=[1, 2, 5, 10]))
     ax.xaxis.set_major_formatter(
         ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
     )
@@ -150,7 +146,8 @@ def plot_grid(log_histories, models, languages, output_path: Path) -> None:
 
             if all_steps:
                 configure_step_axis(ax, sorted(set(all_steps)))
-                style.configure_row_value_axis(axes[row], cap_at_one=False)
+
+    style.configure_value_axis(axes.flat, cap_at_one=False)
 
     style.label_grid(
         axes,
