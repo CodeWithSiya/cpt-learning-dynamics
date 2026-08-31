@@ -369,6 +369,32 @@ def plot_grouped(aggregated, models, languages, task: str, output_path: Path) ->
     )
     logger.info(f"Saved {TASK_DISPLAY_NAMES[task]} grouped grid to {output_path}")
 
+def class_colours(aggregated, languages, task: str) -> dict[str, tuple]:
+    """
+    Assign palette colours to display labels in row order, so the first language
+    takes the first palette entries and a shared label keeps one colour.
+
+    :param aggregated: Mapping from (model, language, task) to aggregated results.
+    :param languages: Languages in row order.
+    :param task: Task whose classes are being coloured.
+    :return: Mapping from display label to colour.
+    """
+    labels = {}
+
+    for language in languages:
+        names = {
+            class_name
+            for (_, cell_language, cell_task), results in aggregated.items()
+            if cell_task == task and cell_language == language
+            for step_results in results.values()
+            for class_name in step_results["per_class_mean"]
+        }
+
+        for class_name in sorted(names, key=class_label):
+            labels.setdefault(class_label(class_name), None)
+
+    return dict(zip(labels, style.categorical_colours(len(labels))))
+
 def plot_per_class(aggregated, models, languages, task: str, output_path: Path) -> None:
     """
     Plot the per-class breakdown of one task, with rows for languages and columns
@@ -392,10 +418,7 @@ def plot_per_class(aggregated, models, languages, task: str, output_path: Path) 
         logger.warning(f"No per-class results for '{task}', skipping that figure.")
         return
 
-    # Colour by display label, so a category shared by both languages under
-    # different names keeps one colour and one legend entry
-    labels = sorted({class_label(class_name) for class_name in class_names})
-    colours = dict(zip(labels, style.categorical_colours(len(labels))))
+    colours = class_colours(aggregated, languages, task)
 
     fig, axes = style.grid_figure(len(languages), len(models), row_labels=True)
 
@@ -459,7 +482,8 @@ def main() -> None:
         output_dir / "downstream_overall.pdf"
     )
 
-    for task in args.tasks:
+    # POS is shown grouped instead, its 17 tags being unreadable as separate lines
+    for task in (task for task in args.tasks if task != "pos"):
         plot_per_class(
             aggregated, args.models, args.languages, task,
             output_dir / f"downstream_{task}_per_class.pdf"
