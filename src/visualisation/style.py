@@ -6,13 +6,15 @@ import shutil
 import matplotlib.pyplot as plt
 import scienceplots
 from matplotlib.patches import Patch
+from matplotlib.transforms import Bbox
 from cycler import cycler
 
 # Figure widths in inches, measured from acmart's sigconf layout
 COLUMN_WIDTH = 3.335
 TEXT_WIDTH = 7.03
 
-PANEL_HEIGHT = 1.28
+PANEL_WIDTH = (TEXT_WIDTH - 0.62) / 4
+PANEL_ASPECT = 0.80
 ROW_LABEL_WIDTH = 0.62
 
 PALETTE = [
@@ -22,17 +24,17 @@ PALETTE = [
     "#db7eb1",  # pink
     "#56b4e9",  # sky blue 
     "#00af81",  # green
-    "#1e64cc",  # blue
-    "#e6a62e",  # gold
+    "#745fc0",  # indigo
+    "#2d72d9",  # blue  
     "#f0785c",  # coral
     "#b85aa8",  # magenta
-    "#745fc0",  # indigo
     "#35a6a0",  # turquoise
     "#8fba4a",  # yellow-green
     "#d95f8d",  # raspberry
     "#c8b63c",  # mustard
     "#5c9bd5",  # medium blue
     "#c875a6",  # mauve
+    "#e6a62e",  # gold
 ]
 
 INK = "#0b0b0b"
@@ -59,7 +61,7 @@ plt.rcParams.update({
     "axes.edgecolor": MUTED_INK,
     "axes.labelcolor": INK,
     "text.color": INK,
-    "lines.linewidth": 1.1,
+    "lines.linewidth": 1.3,
     "lines.solid_capstyle": "round",
     "axes.grid": False,
     "xtick.color": MUTED_INK,
@@ -189,8 +191,8 @@ def balanced_ncol(n: int, max_cols: int) -> int:
 def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
                 sharex: bool | str = True, sharey: bool | str = "row"):
     """
-    Create a panel grid. Every figure spans the text width and every panel row is
-    the same height, so figures need no rescaling to sit side by side in the paper.
+    Create a panel grid. Every figure spans the text width and every panel is the
+    same size; grids with few columns are centred rather than stretched.
 
     :param nrows: Number of panel rows.
     :param ncols: Number of panel columns.
@@ -200,7 +202,7 @@ def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
     :return: The figure and its 2D array of axes.
     """
     width = TEXT_WIDTH
-    height = nrows * (PANEL_HEIGHT + 0.35)
+    height = nrows * (PANEL_WIDTH * PANEL_ASPECT + 0.35)
 
     fig, axes = plt.subplots(
         nrows,
@@ -296,13 +298,14 @@ def row_bands(labels: list[str]) -> list[tuple[str, list[int]]]:
 
     return bands
 
-def draw_row_labels(fig, axes, labels: list[str], left: float) -> None:
+def draw_row_labels(fig, axes, labels: list[str], margin: float, left: float) -> None:
     """
     Draw a horizontal label beside each row, in the margin left of the y labels.
 
     :param fig: Figure holding the grid.
     :param axes: 2D array of axes.
     :param labels: One label per row; runs of the same label share one band label.
+    :param margin: Fraction of the figure width padding the grid on each side.
     :param left: Fraction of the figure width reserved for the labels.
     """
     for label, rows in row_bands(labels):
@@ -310,7 +313,7 @@ def draw_row_labels(fig, axes, labels: list[str], left: float) -> None:
         bottom = axes[rows[-1]][0].get_position().y0
 
         fig.text(
-            left * 0.5,
+            margin + left * 0.5,
             0.5 * (top + bottom),
             label,
             ha="center",
@@ -349,14 +352,18 @@ def finalise_grid(fig, axes, output_path, row_labels: list[str] | None = None,
     legend_fraction = legend_height / fig.get_figheight()
     label_fraction = label_height / fig.get_figheight()
 
+    content = axes.shape[1] * PANEL_WIDTH + (ROW_LABEL_WIDTH if row_labels else 0.0)
+    margin = max(0.0, 0.5 * (fig.get_figwidth() - content)) / fig.get_figwidth()
     left = ROW_LABEL_WIDTH / fig.get_figwidth() if row_labels else 0.0
 
     fig.tight_layout(
-        rect=(left, legend_fraction + label_fraction, 1, 1), h_pad=1.2, w_pad=1.0
+        rect=(margin + left, legend_fraction + label_fraction, 1 - margin, 1),
+        h_pad=1.2,
+        w_pad=1.0,
     )
 
     if row_labels:
-        draw_row_labels(fig, axes, row_labels, left)
+        draw_row_labels(fig, axes, row_labels, margin, left)
 
     if supxlabel is not None:
         supxlabel.set_position((0.5, legend_fraction + 0.35 * label_fraction))
@@ -374,7 +381,9 @@ def finalise_grid(fig, axes, output_path, row_labels: list[str] | None = None,
         handletextpad=0.6,
     )
 
-    fig.savefig(output_path)
+    fig.savefig(output_path, bbox_inches=Bbox.from_bounds(
+        0, 0, fig.get_figwidth(), fig.get_figheight()
+    ))
     plt.close(fig)
 
 def configure_step_axis(ax, steps) -> None:
