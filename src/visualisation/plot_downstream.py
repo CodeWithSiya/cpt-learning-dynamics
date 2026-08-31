@@ -178,7 +178,7 @@ def plot_by_task(aggregated, models, languages, tasks, output_path: Path) -> Non
     :param tasks: Tasks to draw as columns.
     :param output_path: File path to save the figure to.
     """
-    fig, axes = style.grid_figure(len(languages), len(tasks), row_labels=True)
+    fig, axes = style.grid_figure(len(languages), len(tasks), row_labels=True, sharey="col")
 
     for row, language in enumerate(languages):
         for col, task in enumerate(tasks):
@@ -198,7 +198,8 @@ def plot_by_task(aggregated, models, languages, tasks, output_path: Path) -> Non
                 )
                 style.configure_step_axis(ax, steps)
 
-    style.configure_value_axis(axes.flat)
+    for col in range(len(tasks)):
+        style.configure_value_axis(axes[:, col])
 
     style.label_grid(
         axes,

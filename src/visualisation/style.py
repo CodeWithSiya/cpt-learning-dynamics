@@ -401,6 +401,29 @@ def configure_step_axis(ax, steps) -> None:
         ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
     )
 
+def tick_formatter(ticks) -> "ticker.FuncFormatter":
+    """
+    Format ticks to a common number of decimals, dropping the leading zero from
+    values below one, as is conventional for bounded quantities.
+
+    :param ticks: Tick values the axis will show.
+    :return: Formatter for those ticks.
+    """
+    import matplotlib.ticker as ticker
+
+    decimals = 0
+    for value in ticks:
+        for places in range(7):
+            if abs(round(value, places) - value) < 1e-9:
+                decimals = max(decimals, places)
+                break
+
+    def format_tick(value, _):
+        text = f"{value:.{decimals}f}"
+        return text.replace("0.", ".", 1) if abs(value) < 1 and "0." in text else text
+
+    return ticker.FuncFormatter(format_tick)
+
 def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
     """
     Give every panel plotting the same quantity one common y scale, fitted to the
@@ -419,12 +442,9 @@ def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
     low = min(ax.dataLim.intervaly[0] for ax in drawn)
     high = max(ax.dataLim.intervaly[1] for ax in drawn)
 
-    pad = 0.08 * (high - low) if high > low else 0.05
-    locator = ticker.MaxNLocator(nbins=4, steps=[1, 2, 2.5, 5, 10])
-    ticks = locator.tick_values(low - pad, high + pad)
-
-    bottom = max([t for t in ticks if t <= low - pad] or [ticks[0]])
-    top = min([t for t in ticks if t >= high + pad] or [ticks[-1]])
+    pad = 0.06 * (high - low) if high > low else 0.05
+    bottom = low - pad
+    top = high + pad
 
     if low >= 0.0:
         bottom = max(bottom, 0.0)
@@ -432,6 +452,12 @@ def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
     if cap_at_one:
         top = min(top, 1.0)
 
+    locator = ticker.MaxNLocator(nbins=4, steps=[1, 2, 2.5, 5, 10])
+    formatter = tick_formatter(
+        [t for t in locator.tick_values(bottom, top) if bottom <= t <= top]
+    )
+
     for ax in group_axes:
         ax.yaxis.set_major_locator(locator)
+        ax.yaxis.set_major_formatter(formatter)
         ax.set_ylim(bottom, top)
