@@ -118,6 +118,13 @@ def aggregate_step_results(seed_results: list[dict], overall_metric_key: str) ->
         if overall_metric_key in test_metrics:
             overall_values.append(test_metrics[overall_metric_key])
 
+    # Collect accuracy values across seeds, where the task reports one.
+    accuracy_values = [
+        result["test_metrics"]["eval_accuracy"]
+        for result in seed_results
+        if "eval_accuracy" in result["test_metrics"]
+    ]
+
     # Collect per-class F1 values across seeds.
     per_class_values = {}
 
@@ -131,6 +138,8 @@ def aggregate_step_results(seed_results: list[dict], overall_metric_key: str) ->
         "seeds": [result.get("seed") for result in seed_results],
         "overall_mean": float(np.mean(overall_values)) if overall_values else None,
         "overall_std": sample_std(overall_values) if overall_values else None,
+        "accuracy_mean": float(np.mean(accuracy_values)) if accuracy_values else None,
+        "accuracy_std": sample_std(accuracy_values) if accuracy_values else None,
         "per_class_mean": {
             class_name: float(np.mean(scores))
             for class_name, scores in per_class_values.items()
