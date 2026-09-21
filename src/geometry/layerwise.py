@@ -89,7 +89,7 @@ def parse_args() -> Namespace:
     )
     return parser.parse_args()
 
-def compute_layerwise_alignment(english_sentences: list[str], target_sentences: list[str], model: PreTrainedModel, 
+def compute_layerwise_alignment(english_sentences: list[str], target_sentences: list[str], model: PreTrainedModel,
                                 tokenizer: PreTrainedTokenizerBase, device: torch.device, batch_size: int) -> dict:
     """
     Compute alignment metrics for every hidden layer.
