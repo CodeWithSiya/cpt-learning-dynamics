@@ -1,12 +1,12 @@
 """Configuration for continued pretraining (CPT) runs."""
 
 from dataclasses import dataclass
-from typing import Optional, Union
 from pathlib import Path
-
-from src.pretraining.schedule import CheckpointScheduleConfig
+from typing import Optional, Union
 
 import yaml
+
+from src.pretraining.schedule import CheckpointScheduleConfig
 
 @dataclass
 class ModelConfig:

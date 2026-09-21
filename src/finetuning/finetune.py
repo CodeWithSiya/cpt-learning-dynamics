@@ -6,6 +6,10 @@ For each CPT checkpoint, this script performs the following:
 2. Fine-tunes a task-specific head on a downstream dataset.
 3. Evaluates on the test split.
 4. Saves results alongside the checkpoint, under a seed-specific subfolder.
+
+Sources:
+    1. Token Classification: https://huggingface.co/docs/transformers/tasks/token_classification
+    2. Sequence Classification: https://huggingface.co/docs/transformers/tasks/sequence_classification
 """
 
 import argparse
@@ -13,7 +17,6 @@ import json
 import logging
 import os
 import shutil
-import warnings
 from copy import deepcopy
 from argparse import Namespace
 from pathlib import Path
@@ -41,6 +44,7 @@ from sklearn.metrics import accuracy_score, classification_report
 
 from src.finetuning.config import FinetuneConfig, TaskConfig, TaskMetric, TaskType
 from src.utils.extract import discover_checkpoints
+from src.utils.reproducibility import set_reproducibility
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -98,12 +102,6 @@ def parse_args() -> Namespace:
         help="Random seed for this fine-tuning run."
     )
     return parser.parse_args()
-
-def set_reproducibility() -> None:
-    """Configure reproducibility settings for training."""
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    torch.use_deterministic_algorithms(True, warn_only=True)
-    warnings.filterwarnings("ignore", message="Flash Attention defaults to a non-deterministic algorithm")
 
 def unpack_predictions(prediction: EvalPrediction) -> tuple[np.ndarray, np.ndarray]:
     """Extract predicted and reference label IDs."""

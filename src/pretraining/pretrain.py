@@ -1,43 +1,59 @@
-""" 
+"""
 Continued Pretraining (CPT) script for encoder-only models on a given language.
 
 The script performs the following tasks:
 1. Loads a ModelConfig from YAML and a pre-tokenized corpus (produced by src/data/preprocess_wura.py).
 2. Runs dynamic masked language modelling using the HuggingFace Trainer.
 3. Saves model checkpoints using the schedule defined in schedule.py.
-""" 
 
-import os
+Sources:
+    1. Masked Language Modelling: https://github.com/uds-lsv/afro-maft
+"""
+
 import argparse
 import json
-import warnings
-
-from dotenv import load_dotenv
+import logging
+import os
 from argparse import Namespace
-from typing import cast, Optional
 from pathlib import Path
+from typing import Optional, cast
 
 import torch
-
 from datasets import Dataset, load_from_disk
+from dotenv import load_dotenv
 from transformers import (
     AutoModelForMaskedLM,
     AutoTokenizer,
     DataCollatorForLanguageModeling,
     EarlyStoppingCallback,
+    PreTrainedModel,
     PreTrainedTokenizerBase,
     Trainer,
-    TrainingArguments,
-    TrainerControl,
     TrainerCallback,
+    TrainerControl,
     TrainerState,
-    logging,
+    TrainingArguments,
+    logging as hf_logging,
 )
 from transformers.trainer_utils import get_last_checkpoint
 
 from src.pretraining.config import ModelConfig
 from src.pretraining.schedule import compute_checkpoint_steps
 from src.utils.extract import checkpoint_step
+from src.utils.reproducibility import set_reproducibility
+
+# Configure logging to show timestamps and log level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# Quieten per-request hub logs emitted on every checkpoint save
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# Load environment variables
+load_dotenv()
 
 # Constant Values (MLM probability from Devlin et al. [2018])
 RANDOM_SEED = 42
@@ -47,7 +63,7 @@ IS_GPU_AVAILABLE = torch.cuda.is_available()
 class ProgressCallback(TrainerCallback):
     """Log training loss at each logging step."""
 
-    def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs) -> None:
+    def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs: Optional[dict] = None, **kwargs) -> None:
         """
         Print step and loss whenever the trainer logs.
 
@@ -57,7 +73,7 @@ class ProgressCallback(TrainerCallback):
         :param logs: Dict of logged values, expected to contain "loss".
         """
         if logs and "loss" in logs:
-            print(f"Step {state.global_step}/{args.max_steps} | Loss: {logs['loss']:.4f}", flush=True)
+            logger.info(f"Step {state.global_step}/{args.max_steps} | Loss: {logs['loss']:.4f}")
 
 class CheckpointScheduleCallback(TrainerCallback):
     """Save a checkpoint directly on a steps dictated by the two-phase schedule."""
@@ -73,7 +89,7 @@ class CheckpointScheduleCallback(TrainerCallback):
         self.checkpoint_steps = set(checkpoint_steps)
         self.save_dir = save_dir
         self.tokenizer = tokenizer
-        
+
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
         """
         Save the initial baseline checkpoint before training starts, if scheduled.
@@ -83,7 +99,7 @@ class CheckpointScheduleCallback(TrainerCallback):
         :param control: TrainerControl flags.
         """
         if state.global_step > 0:
-            print("Resuming training.", flush=True)
+            logger.info("Resuming training.")
             return
 
         if 0 in self.checkpoint_steps and state.is_world_process_zero:
@@ -91,9 +107,9 @@ class CheckpointScheduleCallback(TrainerCallback):
             if model is not None:
                 model.save_pretrained(self.save_dir / "step-0")
                 self.tokenizer.save_pretrained(self.save_dir / "step-0")
-                print("Saved checkpoint: step-0", flush=True)
+                logger.info("Saved checkpoint: step-0")
 
-    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs) -> None:
         """
         Save directly when the current step is in the schedule.
 
@@ -101,16 +117,10 @@ class CheckpointScheduleCallback(TrainerCallback):
         :param state: TrainerState tracking progress.
         :param control: TrainerControl flags.
         """
-        if state.global_step in self.checkpoint_steps and state.is_world_process_zero: 
+        if state.global_step in self.checkpoint_steps and state.is_world_process_zero:
             kwargs["model"].save_pretrained(self.save_dir / f"step-{state.global_step}")
             self.tokenizer.save_pretrained(self.save_dir / f"step-{state.global_step}")
-            print(f"Saved checkpoint: step-{state.global_step}", flush=True)
-            
-def set_reproducibility() -> None:
-    """Configure determinism settings for training."""
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    torch.use_deterministic_algorithms(True, warn_only=True)
-    warnings.filterwarnings("ignore", message="Flash Attention defaults to a non-deterministic algorithm")
+            logger.info(f"Saved checkpoint: step-{state.global_step}")
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -118,9 +128,9 @@ def parse_args() -> Namespace:
         description="Run continued pretraining for a single model config."
     )
     parser.add_argument(
-        "--model-config", 
-        type=str, 
-        required=True, 
+        "--model-config",
+        type=str,
+        required=True,
         help="Path to model YAML config."
     )
     parser.add_argument(
@@ -147,16 +157,16 @@ def parse_args() -> Namespace:
         default=None,
         help="Optional W&B run ID for resuming a specific run. If omitted, a new run is created."
     )
-    return parser.parse_args() 
+    return parser.parse_args()
 
 def get_full_log_history(checkpoint_dir: Path) -> list[dict]:
     """
     Retrieve the complete log history from the most recent resumption checkpoint.
 
     :param checkpoint_dir: Directory containing checkpoint-N subfolders.
-    :return: Full log history across resumptions. 
-    """   
-    checkpoints = []     
+    :return: Full log history across resumptions.
+    """
+    checkpoints = []
 
     # Search for all checkpoint directories and sort them
     for path in checkpoint_dir.iterdir():
@@ -166,7 +176,7 @@ def get_full_log_history(checkpoint_dir: Path) -> list[dict]:
     if not checkpoints:
         return []
 
-    checkpoints.sort(key=lambda path: checkpoint_step(path, prefix="checkpoint"))  
+    checkpoints.sort(key=lambda path: checkpoint_step(path, prefix="checkpoint"))
 
     # Get the training history fron the latest checkpoint
     latest_checkpoint = checkpoints[-1]
@@ -188,25 +198,25 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     total_steps = config.total_steps
 
     # Initialise the model's pretrained tokenizer
-    logging.set_verbosity_error()
+    hf_logging.set_verbosity_error()
     tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
 
-    def model_init():
+    def model_init() -> PreTrainedModel:
         """Return a new model instance, loading pretrained weights as the CPT starting point."""
         return AutoModelForMaskedLM.from_pretrained(config.model_name_or_path)
 
-    logging.set_verbosity_warning()
+    hf_logging.set_verbosity_warning()
 
     # Load the preprocessed training and evaluation corpora from disk
     chunked_train_corpus = load_from_disk(train_corpus_path)
-    print(f"Loaded {len(chunked_train_corpus):,} pre-tokenized chunks from {train_corpus_path}", flush=True)
+    logger.info(f"Loaded {len(chunked_train_corpus):,} pre-tokenized chunks from {train_corpus_path}")
 
     chunked_validation_corpus = load_from_disk(validation_corpus_path)
-    print(f"Loaded {len(chunked_validation_corpus):,} pre-tokenized chunks from {validation_corpus_path}", flush=True)
+    logger.info(f"Loaded {len(chunked_validation_corpus):,} pre-tokenized chunks from {validation_corpus_path}")
 
     # Compute the CPT checkpoint steps
     checkpoint_steps = compute_checkpoint_steps(total_steps, config=config.checkpoint_schedule)
-    print(f"Checkpoint schedule ({len(checkpoint_steps)} checkpoints): {checkpoint_steps}", flush=True)
+    logger.info(f"Checkpoint schedule ({len(checkpoint_steps)} checkpoints): {checkpoint_steps}")
 
     # Initialise output directory
     output_dir = Path(output_dir_override)
@@ -276,11 +286,11 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     # Resume from the latest resumption checkpoint if one exists
     last_checkpoint = get_last_checkpoint(str(checkpoint_dir)) if checkpoint_dir.exists() else None
     if last_checkpoint:
-        print(f"Resuming training from {last_checkpoint}", flush=True)
+        logger.info(f"Resuming training from {last_checkpoint}")
     else:
-        print(f"No existing checkpoint found. Starting training from scratch.", flush=True)
+        logger.info("No existing checkpoint found. Starting training from scratch.")
 
-    print(f"Running CPT for {total_steps} steps on {config.model_name_or_path}...")
+    logger.info(f"Running CPT for {total_steps} steps on {config.model_name_or_path}...")
     trainer.train(resume_from_checkpoint=last_checkpoint)
 
     # Save final model and full log history
@@ -292,11 +302,10 @@ def run_pretraining(config: ModelConfig, train_corpus_path: str, validation_corp
     with open(output_dir / "log_history.json", "w") as f:
         json.dump(full_history, f, indent=2)
 
-    print("CPT complete.", flush=True)
+    logger.info("CPT complete.")
 
 def main() -> None:
     """Parse CLI arguments and launch a CPT run."""
-    load_dotenv()
     args = parse_args()
     set_reproducibility()
 
@@ -308,12 +317,12 @@ def main() -> None:
     # Load model configuration and launch CPT run
     config = ModelConfig.from_yaml(args.model_config)
     run_pretraining(
-        config, 
-        train_corpus_path=args.train_corpus, 
+        config,
+        train_corpus_path=args.train_corpus,
         validation_corpus_path=args.validation_corpus,
         output_dir_override=args.output_dir,
         wandb_run_id=args.wandb_run_id
     )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
