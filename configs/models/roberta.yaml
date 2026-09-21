@@ -17,7 +17,6 @@ save_steps: 2000
 save_total_limit: 2
 
 # Checkpointing Configuration
-output_dir: "/home/mdnsiy014/scratch/cpt-learning-dynamics/results/roberta-large"
 checkpoint_schedule:
   save_initial_checkpoint: true
 
