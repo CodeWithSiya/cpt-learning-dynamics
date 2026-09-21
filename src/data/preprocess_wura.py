@@ -25,7 +25,7 @@ def parse_args() -> Namespace:
         description="Tokenize and chunk the WURA corpus for a given model config."
     )
     parser.add_argument(
-        "--input",
+        "--input-dir",
         type=str,
         required=True,
         help="Path to the raw corpus on disk, as saved by download_wura.py.",
@@ -37,13 +37,7 @@ def parse_args() -> Namespace:
         help="Path to the model YAML config (provides tokenizer and max_seq_length).",
     )
     parser.add_argument(
-        "--language",
-        type=str,
-        default="xho",
-        help="Language subset to preprocess. Default: xho (isiXhosa)."
-    )
-    parser.add_argument(
-        "--output",
+        "--output-dir",
         type=str,
         required=True,
         help="Directory to save the processed dataset to."
@@ -55,7 +49,7 @@ def parse_args() -> Namespace:
         help="Which split of the raw DatasetDict to preprocess. Default: train.",
     )
     parser.add_argument(
-        "--nproc", 
+        "--nproc",
         type=int,
         default=1,
         help="Number of processes for dataset preprocessing. Default: 1."
@@ -79,12 +73,12 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
             for headline, content in zip(examples["headline"], examples["content"])
         ]
         return tokenizer(texts, truncation=False, return_special_tokens_mask=True)
-    
+
     def _chunk(examples: dict[str, list[list[int]]]):
         """Concatenate and chunk tokenized sequences into fixed-length blocks."""
         # Concatenate examples into one sequence
         concatenated = {k: sum(examples[k], []) for k in examples.keys()}
-        
+
         # Ensure each block is exactly block_size tokens long
         total_length = len(concatenated["input_ids"])
         total_length = (total_length // block_size) * block_size
@@ -95,7 +89,7 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
             for i in range(0, total_length, block_size):
                 result[k].append(v[i: i + block_size])
         return result
-    
+
     hf_logging.set_verbosity_error()
 
     logger.info(f"Tokenizing {len(dataset):,} documents...")
@@ -132,22 +126,22 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path)
 
     # Load the corpus split from disk
-    logger.info(f"Loading raw corpus from {args.input} (split={args.split})...")
-    corpus = load_from_disk(args.input)[args.split]
+    logger.info(f"Loading raw corpus from {args.input_dir} (split={args.split})...")
+    corpus = load_from_disk(args.input_dir)[args.split]
 
     # Preprocess the corpus
     chunked_corpus = tokenize_and_chunk(
-        dataset=corpus, 
-        tokenizer=tokenizer, 
+        dataset=corpus,
+        tokenizer=tokenizer,
         block_size=config.max_seq_length,
         num_proc=args.nproc
     )
 
     # Save the preprocessed corpus
-    output_path = Path(args.output)
+    output_path = Path(args.output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     chunked_corpus.save_to_disk(str(output_path))
     logger.info(f"Saved preprocessed dataset to {output_path}")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

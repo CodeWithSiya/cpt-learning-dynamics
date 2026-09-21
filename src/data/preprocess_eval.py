@@ -15,8 +15,9 @@ Sources:
 import argparse
 import logging
 from argparse import Namespace
-from typing import cast
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from datasets import DatasetDict, load_from_disk
 from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase, logging as hf_logging
@@ -52,7 +53,7 @@ def parse_args() -> Namespace:
         help="Path to evaluation task YAML config."
     )
     parser.add_argument(
-        "--input",
+        "--input-dir",
         type=str,
         required=True,
         help="Directory holding the downloaded task dataset, containing one subdirectory "
@@ -65,7 +66,7 @@ def parse_args() -> Namespace:
         help="Language subset to preprocess. Default: xho (isiXhosa)."
     )
     parser.add_argument(
-        "--output",
+        "--output-dir",
         type=str,
         required=True,
         help="Directory to save the preprocessed dataset to."
@@ -78,7 +79,7 @@ def parse_args() -> Namespace:
     )
 
     return parser.parse_args()
-    
+
 def validate_label_names(dataset: DatasetDict, task_config: TaskConfig) -> None:
     """
     Check that the label names in the task config match the labels in the dataset.
@@ -117,12 +118,12 @@ def validate_label_names(dataset: DatasetDict, task_config: TaskConfig) -> None:
         )
     logger.info(f"Validated {len(observed)} label values against the dataset.")
 
-def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int):
+def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int) -> Callable[[dict[str, list]], BatchEncoding]:
     """
     Create a preprocessing function for token classification tasks.
 
     Tokenises input sequences and aligns word-level labels with the resulting
-    subword tokens. The first subword of each word inherits the word-level label. 
+    subword tokens. The first subword of each word inherits the word-level label.
     Subsequent subwords are assigned -100 and ignored by the loss function.
 
     :param tokenizer: Tokenizer for the model being fine-tuned.
@@ -155,10 +156,10 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_c
                 elif word_id != prev_word:
                     label_ids.append(label[word_id])
                 # For the other tokens in a word, set their label ID to -100
-                else:   
+                else:
                     label_ids.append(IGNORE_INDEX)
                 prev_word = word_id
-            
+
             # Append the label to the list of label IDs
             labels.append(label_ids)
 
@@ -166,14 +167,14 @@ def token_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_c
         tokenized_inputs["labels"] = labels
 
         return tokenized_inputs
-    
+
     return tokenize_and_align_labels
 
-def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int):
+def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int) -> Callable[[dict[str, list]], BatchEncoding]:
     """
     Create a tokenization function for sequence classification tasks.
 
-    Tokenises input sequences and maps string category labels to integer ids 
+    Tokenises input sequences and maps string category labels to integer ids
     using the label2id mapping defined in TaskConfig.
 
     :param tokenizer: Tokenizer for the model being fine-tuned.
@@ -198,13 +199,13 @@ def sequence_classification_preprocessor(tokenizer: PreTrainedTokenizerBase, tas
         ]
 
         return tokenized_inputs
-    
+
     return tokenize_and_map_labels
 
-def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int, num_proc: int):
+def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase, task_config: TaskConfig, max_length: int, num_proc: int) -> DatasetDict:
     """
     Tokenize and prepare an evaluation dataset for fine-tuning.
-    
+
     :param dataset: DatasetDict loaded from disk.
     :param tokenizer: Tokenizer for the model being fine-tuned.
     :param task_config: TaskConfig for the task.
@@ -215,15 +216,15 @@ def preprocess_dataset(dataset: DatasetDict, tokenizer: PreTrainedTokenizerBase,
     # Select the appropriate preprocessor function
     if task_config.task_type == TaskType.TOKEN_CLASSIFICATION:
         preprocessor = token_classification_preprocessor(
-            tokenizer, 
-            task_config, 
+            tokenizer,
+            task_config,
             max_length
         )
         description = f"Tokenising and aligning labels for {task_config.task_name}"
     else:
         preprocessor = sequence_classification_preprocessor(
-            tokenizer, 
-            task_config, 
+            tokenizer,
+            task_config,
             max_length
         )
         description = f"Tokenising and mapping labels for {task_config.task_name}"
@@ -259,7 +260,7 @@ def main() -> None:
     hf_logging.set_verbosity_warning()
 
     # Load evaluation dataset from disk
-    dataset_path = Path(args.input) / args.language
+    dataset_path = Path(args.input_dir) / args.language
     logger.info(f"Loading dataset from {dataset_path}...")
     dataset = cast(DatasetDict, load_from_disk(str(dataset_path)))
     logger.info(f"Loaded splits: { {k: len(v) for k, v in dataset.items()} }")
@@ -269,18 +270,18 @@ def main() -> None:
 
     # Preprocess the dataset
     processed_dataset = preprocess_dataset(
-        dataset=dataset, 
-        tokenizer=tokenizer, 
+        dataset=dataset,
+        tokenizer=tokenizer,
         task_config=task_config,
         max_length=model_config.max_seq_length,
         num_proc=args.nproc
     )
 
     # Save the preprocessed dataset to disk
-    output_path = Path(args.output)
+    output_path = Path(args.output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     processed_dataset.save_to_disk(str(output_path))
     logger.info(f"Saved preprocessed dataset to {output_path}")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

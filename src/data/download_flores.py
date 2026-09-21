@@ -8,13 +8,13 @@ Dataset: https://huggingface.co/datasets/facebook/flores
 import argparse
 import logging
 import os
-from dotenv import load_dotenv
 from argparse import Namespace
 from typing import cast, Optional
 
 from datasets import Dataset, load_dataset
+from dotenv import load_dotenv
 from huggingface_hub import get_token
-  
+
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
@@ -50,7 +50,7 @@ def parse_args() -> Namespace:
         "--cache-dir",
         type=str,
         default=None,
-        help="HuggingFace cache directory for downloaded files. "
+        help="HuggingFace cache directory for downloaded files."
     )
     parser.add_argument(
         "--language",
@@ -64,7 +64,7 @@ def parse_args() -> Namespace:
 def load_flores(language: str, cache_dir: Optional[str] = None) -> Dataset:
     """
     Load the given FLORES-200 language devtest split from HuggingFace.
-    
+
     :param language: FLORES-200 devtest language subset to download.
     :param cache_dir: Path to the HuggingFace cache directory.
     :return: FLORES-200 Dataset for the devtest split.
@@ -90,6 +90,15 @@ def load_flores(language: str, cache_dir: Optional[str] = None) -> Dataset:
 
     return dataset
 
+def log_dataset_info(dataset: Dataset) -> None:
+    """
+    Log basic statistics about the loaded dataset.
+
+    :param dataset: Loaded FLORES-200 devtest Dataset.
+    """
+    logger.info(f"Dataset structure: {dataset}")
+    logger.info(f"Devtest samples: {len(dataset):,}")
+
 def save_dataset(dataset: Dataset, output_dir: str) -> None:
     """
     Save the FLORES-200 devtest dataset to disk in HuggingFace Arrow format.
@@ -101,17 +110,8 @@ def save_dataset(dataset: Dataset, output_dir: str) -> None:
     dataset.save_to_disk(output_dir)
     logger.info(f"Dataset saved to {output_dir}")
 
-def log_dataset_info(dataset: Dataset) -> None:
-    """
-    Log basic statistics about the loaded dataset.
-
-    :param dataset: Loaded FLORES-200 devtest Dataset.
-    """
-    logger.info(f"Dataset structure: {dataset}")
-    logger.info(f"Devtest samples: {len(dataset):,}")
-
 def main() -> None:
-    """Main entry point for downloading the FLORES-200 isiXhosa devtest split."""
+    """Main entry point for downloading the FLORES-200 devtest split."""
     args = parse_args()
 
     cache_dir = args.cache_dir or os.environ.get("HF_DATASETS_CACHE")

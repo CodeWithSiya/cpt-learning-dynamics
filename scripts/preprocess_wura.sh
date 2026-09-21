@@ -63,17 +63,17 @@ for model in "${MODELS[@]}"; do
 
         # Preprocess train split
         uv run python src/data/preprocess_wura.py \
-            --input ${DATA_DIR}/raw/corpus/${language} \
+            --input-dir ${DATA_DIR}/raw/corpus/${language} \
             --model-config configs/models/${model}.yaml \
-            --output ${DATA_DIR}/processed/corpus/${model}/${language}/train \
+            --output-dir ${DATA_DIR}/processed/corpus/${model}/${language}/train \
             --split train \
             --nproc ${SLURM_CPUS_PER_TASK}
 
         # Preprocess validation split
         uv run python src/data/preprocess_wura.py \
-            --input ${DATA_DIR}/raw/corpus/${language} \
+            --input-dir ${DATA_DIR}/raw/corpus/${language} \
             --model-config configs/models/${model}.yaml \
-            --output ${DATA_DIR}/processed/corpus/${model}/${language}/validation \
+            --output-dir ${DATA_DIR}/processed/corpus/${model}/${language}/validation \
             --split validation \
             --nproc ${SLURM_CPUS_PER_TASK}
     done

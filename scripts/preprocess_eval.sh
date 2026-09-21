@@ -71,9 +71,9 @@ for model in "${MODELS[@]}"; do
             uv run python src/data/preprocess_eval.py \
                 --model-config configs/models/${model}.yaml \
                 --task-config configs/evaluation/${task}.yaml \
-                --input ${DATA_DIR}/raw/evaluation/${task} \
+                --input-dir ${DATA_DIR}/raw/evaluation/${task} \
                 --language ${language} \
-                --output ${DATA_DIR}/processed/evaluation/${model}/${language}/${task} \
+                --output-dir ${DATA_DIR}/processed/evaluation/${model}/${language}/${task} \
                 --nproc ${SLURM_CPUS_PER_TASK}
         done
     done
