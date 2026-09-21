@@ -72,7 +72,7 @@ for model in "${MODELS[@]}"; do
         flores_code="${FLORES_CODES[$language]}"
         echo "=== Computing layer-wise alignment for ${model} (${language}) ==="
 
-        uv run python src/evaluation/layerwise.py \
+        uv run python src/geometry/layerwise.py \
             --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
             --flores-dir ${DATA_DIR}/raw/flores \
             --language ${flores_code} \

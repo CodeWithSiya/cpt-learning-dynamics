@@ -18,13 +18,14 @@ from transformers import (
     logging as hf_logging
 )
 
-from src.evaluation.alignment import compute_iso_score
-from src.evaluation.embeddings import (
+from src.geometry.embeddings import (
     DEFAULT_BATCH_SIZE,
     PIVOT_LANGUAGE,
+    SUPPORTED_LANGUAGES,
+    compute_iso_score,
     load_flores_pairs,
     embed_sentences_by_layer,
-    compute_similarity_matrix
+    matched_cosine_similarities
 )
 
 # Configure logging to show timestamps and log level
@@ -38,16 +39,9 @@ logger = logging.getLogger(__name__)
 IS_GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if IS_GPU_AVAILABLE else "cpu")
 
-# Supported target languages
-SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
-
 # Metrics computed at every layer
 LAYERWISE_METRICS = [
     "matched_cosine_similarity",
-    "baseline_cosine_similarity",
-    "cosine_gap",
-    "p_at_1_english_to_target",
-    "p_at_1_target_to_english",
     "iso_score_shared"
 ]
 
@@ -66,7 +60,7 @@ def parse_args() -> Namespace:
         "--flores-dir",
         type=str,
         required=True,
-        help="Path to the root FLORES-200 directory."
+        help="Path to the root FLORES-200 directory, as saved by download_flores.py."
     )
     parser.add_argument(
         "--language",
@@ -117,29 +111,9 @@ def compute_layerwise_alignment(english_sentences: list[str], target_sentences: 
     scores_by_layer = {metric: [] for metric in LAYERWISE_METRICS}
 
     for english_embeddings, target_embeddings in zip(english_layers, target_layers):
-        similarity_matrix = compute_similarity_matrix(english_embeddings, target_embeddings)
-        n = similarity_matrix.shape[0]
-
         # Mean cosine similarity of matched translation pairs
-        matched_mean = float(np.mean(np.diag(similarity_matrix)))
-        scores_by_layer["matched_cosine_similarity"].append(matched_mean)
-
-        # Baseline average over all non-matched pairs
-        baseline_scores = similarity_matrix[~np.eye(n, dtype=bool)]
-        baseline_mean = float(np.mean(baseline_scores))
-        scores_by_layer["baseline_cosine_similarity"].append(baseline_mean)
-
-        scores_by_layer["cosine_gap"].append(matched_mean - baseline_mean)
-
-        # Top-1 retrieval accuracy (P@1) in both directions
-        english_to_target_predictions = similarity_matrix.argmax(axis=1)
-        scores_by_layer["p_at_1_english_to_target"].append(
-            float(np.mean(english_to_target_predictions == np.arange(n)))
-        )
-
-        target_to_english_predictions = similarity_matrix.argmax(axis=0)
-        scores_by_layer["p_at_1_target_to_english"].append(
-            float(np.mean(target_to_english_predictions == np.arange(n)))
+        scores_by_layer["matched_cosine_similarity"].append(
+            float(np.mean(matched_cosine_similarities(english_embeddings, target_embeddings)))
         )
 
         # Isotropy of this layer's shared bilingual representation space
@@ -147,9 +121,9 @@ def compute_layerwise_alignment(english_sentences: list[str], target_sentences: 
             compute_iso_score(np.concatenate([english_embeddings, target_embeddings], axis=0))
         )
 
-    return {"num_layers": len(scores_by_layer["cosine_gap"]), **scores_by_layer}
+    return {"num_layers": len(scores_by_layer["matched_cosine_similarity"]), **scores_by_layer}
 
-def main():
+def main() -> None:
     """Parse CLI arguments and compute layer-wise alignment for selected checkpoints."""
     args = parse_args()
 
@@ -164,23 +138,29 @@ def main():
 
     requested_steps = [int(step.strip()) for step in args.checkpoints.split(",")]
 
+    # Keep only the requested steps that are present on disk
+    checkpoints = []
+    for step in requested_steps:
+        checkpoint_path = checkpoint_dir / f"step-{step}"
+        if checkpoint_path.exists():
+            checkpoints.append((step, checkpoint_path))
+        else:
+            logger.warning(f"Checkpoint step-{step} not found in {checkpoint_dir}, skipping.")
+
+    if not checkpoints:
+        raise ValueError(f"None of the requested checkpoints were found in {checkpoint_dir}.")
+
     # Load FLORES-200 parallel sentences
     english_sentences, target_sentences = load_flores_pairs(flores_pairs_dir, args.language)
 
-    # CPT leaves the tokenizer unchanged, so load it once from the first requested checkpoint
-    first_checkpoint = checkpoint_dir / f"step-{requested_steps[0]}"
+    # CPT leaves the tokenizer unchanged, so load it once from the first checkpoint
     hf_logging.set_verbosity_error()
-    tokenizer = AutoTokenizer.from_pretrained(first_checkpoint)
+    tokenizer = AutoTokenizer.from_pretrained(checkpoints[0][1])
     hf_logging.set_verbosity_warning()
 
     results = {}
 
-    for step in requested_steps:
-        checkpoint_path = checkpoint_dir / f"step-{step}"
-        if not checkpoint_path.exists():
-            logger.warning(f"Checkpoint step-{step} not found in {checkpoint_dir}, skipping.")
-            continue
-
+    for step, checkpoint_path in checkpoints:
         logger.info(f"Computing layer-wise alignment for step-{step}...")
 
         # Load the base encoder for this checkpoint
@@ -197,8 +177,9 @@ def main():
 
         logger.info(
             f"step-{step}: {layerwise_scores['num_layers']} layers, "
-            f"cosine gap range [{min(layerwise_scores['cosine_gap']):.4f}, "
-            f"{max(layerwise_scores['cosine_gap']):.4f}]"
+            f"matched cosine similarity range "
+            f"[{min(layerwise_scores['matched_cosine_similarity']):.4f}, "
+            f"{max(layerwise_scores['matched_cosine_similarity']):.4f}]"
         )
 
         # Free GPU memory before loading the next checkpoint
