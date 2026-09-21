@@ -69,7 +69,7 @@ for model in "${MODELS[@]}"; do
         flores_code="${FLORES_CODES[$language]}"
         echo "=== Computing cross-lingual alignment for ${model} (${language}) ==="
 
-        uv run python src/evaluation/alignment.py \
+        uv run python src/geometry/alignment.py \
             --checkpoint-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/checkpoints \
             --flores-dir ${DATA_DIR}/raw/flores \
             --language ${flores_code} \

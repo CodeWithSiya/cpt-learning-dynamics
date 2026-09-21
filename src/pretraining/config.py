@@ -1,12 +1,12 @@
 """Configuration for continued pretraining (CPT) runs."""
 
 from dataclasses import dataclass
-from typing import Optional, Union
 from pathlib import Path
-
-from src.pretraining.schedule import CheckpointScheduleConfig
+from typing import Optional, Union
 
 import yaml
+
+from src.pretraining.schedule import CheckpointScheduleConfig
 
 @dataclass
 class ModelConfig:
@@ -22,7 +22,6 @@ class ModelConfig:
         total_steps: Total number of training steps.
         warmup_steps: Number of linear warmup steps.
         eval_steps: Frequency at which validation loss is computed.
-        output_dir: Directory to write checkpoints and logs to.
         checkpoint_schedule: Checkpoint schedule configuration.
         use_early_stopping: Whether to apply early stopping based on validation loss.
         early_stopping_patience: Number of non-improving evals to tolerate before stopping.
@@ -40,7 +39,6 @@ class ModelConfig:
     total_steps: int
     warmup_steps: int
     eval_steps: int
-    output_dir: str
     checkpoint_schedule: CheckpointScheduleConfig
     use_early_stopping: bool = False
     early_stopping_patience: int = 5

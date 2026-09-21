@@ -234,3 +234,9 @@ wandb
 
 # Local Scripts
 download_plots.sh
+
+# Results
+results
+
+# MacOS
+.DS_Store

@@ -5,11 +5,11 @@
 #SBATCH --nodes=1 --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --time=00:30:00
-#SBATCH --job-name="cpt-aggregate"
+#SBATCH --job-name="cpt-plot-downstream"
 #SBATCH --mail-user=mdnsiy014@myuct.ac.za
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output=logs/aggregate_%j.log
-#SBATCH --error=logs/aggregate_%j.log
+#SBATCH --output=logs/plot_downstream_%j.log
+#SBATCH --error=logs/plot_downstream_%j.log
 
 # Update to latest commit
 git pull
@@ -31,10 +31,8 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
-# All models available for aggregation
+# All models and languages available for plotting
 ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
-
-# All language subsets to aggregate
 ALL_LANGUAGES=("xho" "zul")
 
 # Evaluation tasks available for each language
@@ -43,26 +41,11 @@ declare -A LANGUAGE_TASKS=(
     ["zul"]="ner pos ntc_zul"
 )
 
-# First script argument selects a single model; if omitted, loop through all models
-MODEL_ARG="$1"
-if [ -n "${MODEL_ARG}" ]; then
-    MODELS=("${MODEL_ARG}")
-else
-    MODELS=("${ALL_MODELS[@]}")
-fi
-
-# Second script argument selects a single language; if omitted, loop through all languages
-LANGUAGE_ARG="$2"
-if [ -n "${LANGUAGE_ARG}" ]; then
-    LANGUAGES=("${LANGUAGE_ARG}")
-else
-    LANGUAGES=("${ALL_LANGUAGES[@]}")
-fi
-
-for model in "${MODELS[@]}"; do
-    for language in "${LANGUAGES[@]}"; do
+# Aggregate across seeds first, since the figures read the aggregated results
+for model in "${ALL_MODELS[@]}"; do
+    for language in "${ALL_LANGUAGES[@]}"; do
         for task in ${LANGUAGE_TASKS[$language]}; do
-            echo "=== Aggregating ${task} (${language}) results for ${model} across seeds ==="
+            echo "=== Aggregating ${task} (${language}) results for ${model} ==="
 
             uv run python src/finetuning/aggregate.py \
                 --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
@@ -71,3 +54,12 @@ for model in "${MODELS[@]}"; do
         done
     done
 done
+
+# Every figure here is a grid spanning all models and languages at once, so
+# there is nothing to loop over; any subset is selected with the flags below.
+echo "=== Plotting downstream result grids ==="
+
+uv run python src/visualisation/plot_downstream.py \
+    --results-dir ${SCRATCH}/cpt-learning-dynamics/results \
+    --output-dir ${SCRATCH}/cpt-learning-dynamics/results/plots/downstream \
+    "$@"

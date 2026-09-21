@@ -9,12 +9,14 @@ from typing import cast
 import numpy as np
 import torch
 from datasets import Dataset, load_from_disk
+from IsoScore import IsoScore
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 # Constant Values
 MAX_SEQ_LENGTH = 512
 DEFAULT_BATCH_SIZE = 64
 PIVOT_LANGUAGE = "eng_Latn"
+SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -149,19 +151,25 @@ def embed_sentences_by_layer(sentences: list[str], model: PreTrainedModel, token
 
     return [np.concatenate(batches, axis=0) for batches in batch_embeddings_by_layer]
 
-def compute_similarity_matrix(embeddings_a: np.ndarray, embeddings_b: np.ndarray) -> np.ndarray:
+def matched_cosine_similarities(embeddings_a: np.ndarray, embeddings_b: np.ndarray) -> np.ndarray:
     """
-    Compute a cosine similarity matrix between two sets of embeddings.
-    
-    Each embedding is L2-normalised before computing pairwise cosine 
-    similarities, following Idris et al. (2026)
+    Compute the cosine similarity of each aligned embedding pair.
 
     :param embeddings_a: Array of shape (N, D), one embedding per row.
-    :param embeddings_b: Array of shape (M, D), one embedding per row.
-    :return: Similarity matrix of shape (N, M), where entry [i, j] is the
-             cosine similarity between embeddings_a[i] and embeddings_b[j].
+    :param embeddings_b: Array of shape (N, D), aligned row-wise with embeddings_a.
+    :return: Array of shape (N,), where entry [i] is the cosine similarity
+             between embeddings_a[i] and embeddings_b[i].
     """
     normed_a = embeddings_a / np.linalg.norm(embeddings_a, axis=1, keepdims=True)
     normed_b = embeddings_b / np.linalg.norm(embeddings_b, axis=1, keepdims=True)
-    
-    return normed_a @ normed_b.T
+
+    return np.sum(normed_a * normed_b, axis=1)
+
+def compute_iso_score(embeddings: np.ndarray) -> float:
+    """
+    Compute the IsoScore of a point cloud, following Rudman et al. (2022).
+
+    :param embeddings: Array of shape (N, D), one embedding per row.
+    :return: IsoScore in [0, 1], where 1 indicates a perfectly isotropic cloud.
+    """
+    return float(IsoScore.IsoScore(embeddings.astype(np.float64)))

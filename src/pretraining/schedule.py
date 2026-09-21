@@ -6,8 +6,16 @@ Implements the two-phase checkpointing schedule from Elhady et al. (2025):
     - Phase 2 (remaining 90% of steps): checkpoint every 10% of total steps.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
+
+# Configure logging to show timestamps and log level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class CheckpointScheduleConfig:
@@ -41,16 +49,16 @@ def compute_checkpoint_steps(total_steps: int, config: Optional[CheckpointSchedu
     :param config: Checkpoint schedule configuration. Uses default two-phase schedule if not provided.
     :return: Sorted list of steps at which to save checkpoints.
     """
-    if total_steps <= 0: 
+    if total_steps <= 0:
         raise ValueError(f"total_steps must be positive, got {total_steps}")
-    
-    if config is None: 
+
+    if config is None:
         config = CheckpointScheduleConfig()
 
     checkpoint_steps = []
 
     # Include the initial step if required
-    if config.save_initial_checkpoint: 
+    if config.save_initial_checkpoint:
         checkpoint_steps.append(0)
 
     # Phase 1: Checkpoints during the initial training phase
@@ -83,20 +91,20 @@ def compute_checkpoint_steps(total_steps: int, config: Optional[CheckpointSchedu
 def log_checkpoint_schedule(total_steps: int, steps: list[int]) -> None:
     """
     Log a summary of the checkpoint schedule.
-    
+
     :param total_steps: Total number of training steps.
     :param steps: List of checkpoint steps.
     """
-    print(f"Checkpoint schedule ({len(steps)} checkpoints over {total_steps:,} steps):")
+    logger.info(f"Checkpoint schedule ({len(steps)} checkpoints over {total_steps:,} steps):")
     for i, step in enumerate(steps):
         pct = (step / total_steps) * 100
-        print(f"  Checkpoint {i + 1:>2}: step {step:>7,} ({pct:.0f}%)")
+        logger.info(f"  Checkpoint {i + 1:>2}: step {step:>7,} ({pct:.0f}%)")
 
 def main() -> None:
     """Main entry point for verifying the checkpoint schedule."""
-    # Verify schedule for encoder-only models (600k steps)
-    steps = compute_checkpoint_steps(total_steps=600_000)
-    log_checkpoint_schedule(600_000, steps)
+    # Verify schedule for encoder-only models (200k steps)
+    steps = compute_checkpoint_steps(total_steps=200_000)
+    log_checkpoint_schedule(200_000, steps)
 
 if __name__ == "__main__":
     main()

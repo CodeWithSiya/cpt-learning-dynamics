@@ -12,17 +12,14 @@ import argparse
 import logging
 import os
 import time
-from dotenv import load_dotenv
 from argparse import Namespace
 from dataclasses import dataclass
 from typing import cast, Optional
 
 import requests
 from datasets import DatasetDict, load_dataset
+from dotenv import load_dotenv
 from huggingface_hub import get_token
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -31,12 +28,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
 @dataclass
 class EvalTaskConfig:
     """Configuration for a single evaluation task dataset."""
     dataset_name: Optional[str]
     trust_remote_code: bool
-    splits: list[str]
     languages: list[str]
     description: str
     tsv_url: Optional[str] = None
@@ -55,28 +54,24 @@ EVAL_TASKS = {
     "ner": EvalTaskConfig(
         dataset_name="masakhane/masakhaner2",
         trust_remote_code=True,
-        splits=["train", "validation", "test"],
         languages=["xho", "zul"],
         description="MasakhaNER 2.0: Named Entity Recognition"
     ),
     "pos": EvalTaskConfig(
         dataset_name="masakhane/masakhapos",
         trust_remote_code=True,
-        splits=["train", "validation", "test"],
         languages=["xho", "zul"],
         description="MasakhaPOS: Part-of-Speech Tagging"
     ),
     "ntc_xho": EvalTaskConfig(
         dataset_name="masakhane/masakhanews",
         trust_remote_code=False,
-        splits=["train", "validation", "test"],
         languages=["xho"],
         description="MasakhaNEWS: News Topic Classification"
     ),
     "ntc_zul": EvalTaskConfig(
         dataset_name=None,
         trust_remote_code=False,
-        splits=["train", "validation", "test"],
         languages=["zul"],
         description="ANTC: African News Topic Classification",
         tsv_url=ANTC_URL
@@ -99,13 +94,6 @@ def parse_args() -> Namespace:
         help="Evaluation tasks to download. Defaults to all tasks."
     )
     parser.add_argument(
-        "--language",
-        type=str,
-        default="xho",
-        choices=SUPPORTED_LANGUAGES,
-        help="Language subset to download. Default: xho (isiXhosa)."
-    )
-    parser.add_argument(
         "--output-dir",
         type=str,
         default=os.path.join(os.environ.get("DATA_DIR", "datasets"), "raw/evaluation"),
@@ -115,7 +103,14 @@ def parse_args() -> Namespace:
         "--cache-dir",
         type=str,
         default=None,
-        help="HuggingFace cache directory."
+        help="HuggingFace cache directory for downloaded files."
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="xho",
+        choices=SUPPORTED_LANGUAGES,
+        help="Language subset to download. Default: xho (isiXhosa)."
     )
     return parser.parse_args()
 
@@ -226,7 +221,7 @@ def load_eval_dataset(task_name: str, config: EvalTaskConfig, language: str, out
 def log_dataset_info(task_name: str, dataset: DatasetDict) -> None:
     """
     Log basic statistics about a loaded evaluation task.
-    
+
     :param task_name: Name of the evaluation task.
     :param dataset: Loaded DatasetDict.
     """
@@ -246,7 +241,7 @@ def save_eval_dataset(dataset: DatasetDict, task_name: str, language: str, outpu
     :param task_name: Name of the evaluation task.
     :param language: Language subset.
     :param output_dir: Root directory for evaluation datasets.
-    """ 
+    """
     task_dir = os.path.join(output_dir, task_name, language)
     os.makedirs(task_dir, exist_ok=True)
     dataset.save_to_disk(task_dir)

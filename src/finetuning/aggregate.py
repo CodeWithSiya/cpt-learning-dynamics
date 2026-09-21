@@ -10,20 +10,15 @@ from pathlib import Path
 
 import numpy as np
 
+from src.finetuning.config import TaskConfig
+from src.utils.extract import checkpoint_step
+
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-# Evaluation metric for each task
-TASK_METRICS = {
-    "ner": "f1",
-    "pos": "f1",
-    "ntc_xho": "f1",
-    "ntc_zul": "f1"
-}
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -37,11 +32,10 @@ def parse_args() -> Namespace:
         help="Root directory containing fine-tuning results."
     )
     parser.add_argument(
-        "--task",
+        "--task-config",
         type=str,
         required=True,
-        choices=list(TASK_METRICS.keys()),
-        help="Task to aggregate."
+        help="Path to evaluation task YAML config."
     )
     parser.add_argument(
         "--output",
@@ -50,10 +44,6 @@ def parse_args() -> Namespace:
         help="File path to save the aggregated results JSON to."
     )
     return parser.parse_args()
-
-def checkpoint_step(path: Path) -> int:
-    """Extract the training step number from a checkpoint directory name."""
-    return int(path.name.split("-")[1])
 
 def load_seed_results(results_dir: Path, task: str) -> dict[int, list[dict]]:
     """
@@ -118,6 +108,13 @@ def aggregate_step_results(seed_results: list[dict], overall_metric_key: str) ->
         if overall_metric_key in test_metrics:
             overall_values.append(test_metrics[overall_metric_key])
 
+    # Collect accuracy values across seeds, where the task reports one.
+    accuracy_values = [
+        result["test_metrics"]["eval_accuracy"]
+        for result in seed_results
+        if "eval_accuracy" in result["test_metrics"]
+    ]
+
     # Collect per-class F1 values across seeds.
     per_class_values = {}
 
@@ -131,6 +128,8 @@ def aggregate_step_results(seed_results: list[dict], overall_metric_key: str) ->
         "seeds": [result.get("seed") for result in seed_results],
         "overall_mean": float(np.mean(overall_values)) if overall_values else None,
         "overall_std": sample_std(overall_values) if overall_values else None,
+        "accuracy_mean": float(np.mean(accuracy_values)) if accuracy_values else None,
+        "accuracy_std": sample_std(accuracy_values) if accuracy_values else None,
         "per_class_mean": {
             class_name: float(np.mean(scores))
             for class_name, scores in per_class_values.items()
@@ -145,15 +144,17 @@ def main() -> None:
     """Main entry point for aggregating fine-tuning results across seeds."""
     args = parse_args()
 
+    task_config = TaskConfig.from_yaml(args.task_config)
+
     results_dir = Path(args.results_dir)
-    results_by_step = load_seed_results(results_dir, args.task)
+    results_by_step = load_seed_results(results_dir, task_config.task_name)
 
     if not results_by_step:
-        logger.error(f"No results found for task '{args.task}' in {results_dir}")
+        logger.error(f"No results found for task '{task_config.task_name}' in {results_dir}")
         return
 
     # Aggregate metrics across seeds for each checkpoint
-    overall_metric_key = f"eval_{TASK_METRICS[args.task]}"
+    overall_metric_key = f"eval_{task_config.best_model_metric}"
     aggregated = {
         step: aggregate_step_results(seed_results, overall_metric_key)
         for step, seed_results in results_by_step.items()

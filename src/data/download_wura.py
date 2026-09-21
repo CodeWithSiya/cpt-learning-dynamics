@@ -7,13 +7,13 @@ Dataset: https://huggingface.co/datasets/castorini/wura
 import argparse
 import logging
 import os
-from dotenv import load_dotenv
 from argparse import Namespace
 from typing import cast, Optional
 
 from datasets import DatasetDict, load_dataset
+from dotenv import load_dotenv
 from huggingface_hub import get_token
-  
+
 # Configure logging to show timestamps and log level
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +43,7 @@ def parse_args() -> Namespace:
         "--cache-dir",
         type=str,
         default=None,
-        help="HuggingFace cache directory for downloaded files. "
+        help="HuggingFace cache directory for downloaded files."
     )
     parser.add_argument(
         "--language",
@@ -57,7 +57,7 @@ def parse_args() -> Namespace:
 def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
     """
     Load the given WURA language dataset from HuggingFace.
-    
+
     :param language: WURA language subset to download.
     :param cache_dir: Path to the HuggingFace cache directory.
     :return: Dataset with 'train' and 'validation' splits.
@@ -85,7 +85,7 @@ def load_wura(language: str, cache_dir: Optional[str] = None) -> DatasetDict:
 def log_dataset_info(dataset: DatasetDict) -> None:
     """
     Log basic statistics about the loaded dataset.
-    
+
     :param dataset: Loaded WURA DatasetDict.
     """
     logger.info(f"Dataset structure: {dataset}")
@@ -95,7 +95,7 @@ def log_dataset_info(dataset: DatasetDict) -> None:
 def save_dataset(dataset: DatasetDict, output_dir: str) -> None:
     """
     Save the WURA dataset to disk.
-    
+
     :param dataset: Loaded WURA DatasetDict to save.
     :param output_dir: Directory path to save the dataset to.
     """

@@ -18,15 +18,16 @@ from transformers import (
     logging as hf_logging
 )
 
-from IsoScore import IsoScore
-
-from src.evaluation.embeddings import (
+from src.geometry.embeddings import (
     DEFAULT_BATCH_SIZE,
     PIVOT_LANGUAGE,
+    SUPPORTED_LANGUAGES,
+    compute_iso_score,
     load_flores_pairs,
     embed_sentences,
-    compute_similarity_matrix
+    matched_cosine_similarities
 )
+from src.utils.extract import checkpoint_step, discover_checkpoints
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -38,9 +39,6 @@ logger = logging.getLogger(__name__)
 # Constant Values
 IS_GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if IS_GPU_AVAILABLE else "cpu")
-
-# Supported target languages
-SUPPORTED_LANGUAGES = ["xho_Latn", "zul_Latn"]
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -70,7 +68,7 @@ def parse_args() -> Namespace:
         "--output",
         type=str,
         required=True,
-        help="File path to save the cosine similarity results JSON to."
+        help="File path to save the alignment results JSON to."
     )
     parser.add_argument(
         "--batch-size",
@@ -80,44 +78,11 @@ def parse_args() -> Namespace:
     )
     return parser.parse_args()
 
-def checkpoint_step(path: Path) -> int:
-    """Extract the training step number from a checkpoint directory name."""
-    return int(path.name.split("-")[1])
-
-def discover_checkpoints(checkpoint_dir: Path) -> list[Path]:
-    """
-    Discover all CPT checkpoints in a directory, sorted by step number.
-
-    :param checkpoint_dir: Path to directory containing checkpoint subfolders.
-    :return: Sorted list of checkpoint paths.
-    """
-    checkpoints = []
-
-    # Search for checkpoint directories that begin with 'step-'
-    for path in checkpoint_dir.iterdir():
-        if path.is_dir() and path.name.startswith("step-"):
-            checkpoints.append(path)
-
-    # Sort the checkpoints by step numbers
-    checkpoints.sort(key=checkpoint_step)
-
-    return checkpoints
-
-def compute_iso_score(embeddings: np.ndarray) -> float:
-    """
-    Compute the IsoScore of a point cloud, following Rudman et al. (2022).
-
-    :param embeddings: Array of shape (N, D), one embedding per row.
-    :return: IsoScore in [0, 1], where 1 indicates a perfectly isotropic cloud.
-    """
-    return float(IsoScore.IsoScore(embeddings.astype(np.float64)))
-
 def compute_alignment_score(english_sentences: list[str], target_sentences: list[str],
                             model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, device: torch.device,
                             batch_size: int) -> dict:
     """
-    Compute the cosine gap and top-1 retrieval accuracy (P@1) between
-    aligned translation pairs and a baseline, for a single checkpoint.
+    Compute cross-lingual alignment and representation isotropy for a single checkpoint.
 
     :param english_sentences: List of English sentences.
     :param target_sentences: List of parallel target-language sentences.
@@ -125,29 +90,14 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
     :param tokenizer: Tokenizer matching the model.
     :param device: Device to run the embedding lookup on.
     :param batch_size: Number of sentences to embed per forward pass.
-    :return: Dictionary with matched, baseline, cosine gap, P@1 and IsoScore values.
+    :return: Dictionary with the matched cosine similarity and IsoScore values.
     """
     # Compute static embeddings for each example sentence
     english_embeddings = embed_sentences(english_sentences, model, tokenizer, device, batch_size)
     target_embeddings = embed_sentences(target_sentences, model, tokenizer, device, batch_size)
 
-    # Compute a cosine similarity matrix between the parallel sentence embeddings
-    similarity_matrix = compute_similarity_matrix(english_embeddings, target_embeddings)
-
     # Compute the mean cosine similarity of matched translation pairs
-    matched_mean = float(np.mean(np.diag(similarity_matrix)))
-
-    # Compute the baseline average over all non-matched pairs
-    n = similarity_matrix.shape[0]
-    baseline_scores = similarity_matrix[~np.eye(n, dtype=bool)]
-    baseline_mean = float(np.mean(baseline_scores))
-
-    # Compute top-1 retrieval accuracy (P@1) in both directions
-    english_to_target_predictions = similarity_matrix.argmax(axis=1)
-    p_at_1_english_to_target = float(np.mean(english_to_target_predictions == np.arange(n)))
-
-    target_to_english_predictions = similarity_matrix.argmax(axis=0)
-    p_at_1_target_to_english = float(np.mean(target_to_english_predictions == np.arange(n)))
+    matched_mean = float(np.mean(matched_cosine_similarities(english_embeddings, target_embeddings)))
 
     # Compute the isotropy of the shared bilingual representation space
     iso_score_shared = compute_iso_score(
@@ -156,14 +106,10 @@ def compute_alignment_score(english_sentences: list[str], target_sentences: list
 
     return {
         "matched_cosine_similarity": matched_mean,
-        "baseline_cosine_similarity": baseline_mean,
-        "cosine_gap": matched_mean - baseline_mean,
-        "p_at_1_english_to_target": p_at_1_english_to_target,
-        "p_at_1_target_to_english": p_at_1_target_to_english,
         "iso_score_shared": iso_score_shared
     }
 
-def main():
+def main() -> None:
     """Parse CLI arguments and compute cross-lingual alignment across checkpoints."""
     args = parse_args()
 
