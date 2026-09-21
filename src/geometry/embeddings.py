@@ -155,9 +155,6 @@ def matched_cosine_similarities(embeddings_a: np.ndarray, embeddings_b: np.ndarr
     """
     Compute the cosine similarity of each aligned embedding pair.
 
-    Each embedding is L2-normalised before computing the cosine similarity,
-    following Idris et al. (2026)
-
     :param embeddings_a: Array of shape (N, D), one embedding per row.
     :param embeddings_b: Array of shape (N, D), aligned row-wise with embeddings_a.
     :return: Array of shape (N,), where entry [i] is the cosine similarity
