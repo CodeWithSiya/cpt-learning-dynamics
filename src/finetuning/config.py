@@ -5,7 +5,7 @@ Configurations for finetuning and downstream evaluation tasks.
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
 
 import yaml
 
@@ -17,7 +17,7 @@ class TaskType(Enum):
 class TaskMetric(Enum):
     """Enum which represents a downstream evaluation metric."""
     SPAN_F1 = "span"
-    TOKEN_F1 = "token" 
+    TOKEN_F1 = "token"
     SEQUENCE_F1 = "sequence"
 
 @dataclass
@@ -44,12 +44,12 @@ class TaskConfig:
         """Validate configuration values after construction."""
         if not self.label_names:
             raise ValueError("label_names must not be empty")
-        
+
     @property
     def num_labels(self) -> int:
         """Number of labels for this task."""
         return len(self.label_names)
-    
+
     @property
     def best_model_metric(self) -> str:
         """Name of the metric used to select the best checkpoint during fine-tuning."""
@@ -59,12 +59,12 @@ class TaskConfig:
     def id2label(self) -> dict[int, str]:
         """Mapping from integer id to label name."""
         return {i: label for i, label in enumerate(self.label_names)}
-    
+
     @property
     def label2id(self) -> dict[str, int]:
         """Mapping from label name to integer id."""
         return {label: i for i, label in enumerate(self.label_names)}
-    
+
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "TaskConfig":
         """
@@ -78,7 +78,7 @@ class TaskConfig:
         data["task_type"] = TaskType(data["task_type"])
         data["metric"] = TaskMetric(data["metric"])
         return cls(**data)
-    
+
 @dataclass
 class FinetuneConfig:
     """
@@ -106,7 +106,7 @@ class FinetuneConfig:
             raise ValueError(f"batch_size must be positive, got {self.batch_size}")
         if not 0 <= self.warmup_ratio <= 1:
             raise ValueError(f"warmup_ratio must be between 0 and 1, got {self.warmup_ratio}")
-        
+
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "FinetuneConfig":
         """

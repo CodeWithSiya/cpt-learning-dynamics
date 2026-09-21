@@ -8,21 +8,22 @@ For each CPT checkpoint, this script performs the following:
 4. Saves results alongside the checkpoint, under a seed-specific subfolder.
 """
 
-import os
+import argparse
 import json
 import logging
-import argparse
+import os
 import shutil
 import warnings
 from copy import deepcopy
-from dotenv import load_dotenv
 from argparse import Namespace
 from pathlib import Path
+from collections.abc import Callable
 from typing import cast
 
 import numpy as np
 import torch
 from datasets import DatasetDict, load_from_disk
+from dotenv import load_dotenv
 from evaluate import load as load_metric
 from transformers import (
     AutoModelForSequenceClassification,
@@ -31,14 +32,15 @@ from transformers import (
     DataCollatorForTokenClassification,
     DataCollatorWithPadding,
     EvalPrediction,
+    PreTrainedModel,
     Trainer,
     TrainingArguments,
     logging as hf_logging
 )
-
 from sklearn.metrics import accuracy_score, classification_report
 
 from src.finetuning.config import FinetuneConfig, TaskConfig, TaskMetric, TaskType
+from src.utils.extract import discover_checkpoints
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -46,6 +48,9 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Load environment variables
+load_dotenv()
 
 # Constant Values
 IGNORE_INDEX = -100
@@ -100,37 +105,14 @@ def set_reproducibility() -> None:
     torch.use_deterministic_algorithms(True, warn_only=True)
     warnings.filterwarnings("ignore", message="Flash Attention defaults to a non-deterministic algorithm")
 
-def checkpoint_step(path: Path) -> int:
-    """Extract the training step number from a checkpoint directory name."""
-    return int(path.name.split("-")[1])
-
-def discover_checkpoints(checkpoint_dir: Path) -> list[Path]:
-    """
-    Discover all CPT checkpoints in a directory, sorted by step number.
-
-    :param checkpoint_dir: Path to directory containing checkpoint subfolders.
-    :return: Sorted list of checkpoint paths.
-    """
-    checkpoints = []
-
-    # Search for checkpoint directories that begin with 'step-'
-    for path in checkpoint_dir.iterdir():
-        if path.is_dir() and path.name.startswith("step-"):
-            checkpoints.append(path)
-
-    # Sort the checkpoints by step numbers
-    checkpoints.sort(key=checkpoint_step)
-
-    return checkpoints
-
-def unpack_predictions(prediction: EvalPrediction):
+def unpack_predictions(prediction: EvalPrediction) -> tuple[np.ndarray, np.ndarray]:
     """Extract predicted and reference label IDs."""
-    logits = prediction.predictions
-    labels = prediction.label_ids
+    logits = cast(np.ndarray, prediction.predictions)
+    labels = cast(np.ndarray, prediction.label_ids)
     predictions = np.argmax(logits, axis=-1)
     return predictions, labels
 
-def create_compute_metrics(task_config: TaskConfig):
+def create_compute_metrics(task_config: TaskConfig) -> Callable[[EvalPrediction], dict]:
     """
     Create a compute_metrics function for the HuggingFace Trainer.
 
@@ -147,7 +129,7 @@ def create_compute_metrics(task_config: TaskConfig):
             if "-" in label
         ))
 
-        def compute_metrics(prediction: EvalPrediction):
+        def compute_metrics(prediction: EvalPrediction) -> dict:
             """Compute span-level per-class F1 for NER, plus macro and micro overall F1."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
@@ -191,7 +173,7 @@ def create_compute_metrics(task_config: TaskConfig):
             )
 
             return {
-                "f1": macro_f1,                                    
+                "f1": macro_f1,
                 "precision": results.get("overall_precision", 0.0),
                 "recall": results.get("overall_recall", 0.0),
                 "micro_f1": results.get("overall_f1", 0.0),
@@ -200,7 +182,7 @@ def create_compute_metrics(task_config: TaskConfig):
 
     elif task_config.metric == TaskMetric.TOKEN_F1:
 
-        def compute_metrics(prediction: EvalPrediction):
+        def compute_metrics(prediction: EvalPrediction) -> dict:
             """Compute token-level per-class F1 for POS, plus macro F1 and accuracy."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
@@ -244,7 +226,7 @@ def create_compute_metrics(task_config: TaskConfig):
 
     elif task_config.metric == TaskMetric.SEQUENCE_F1:
 
-        def compute_metrics(prediction: EvalPrediction):
+        def compute_metrics(prediction: EvalPrediction) -> dict:
             """Compute sequence-level per-class F1 for NTC, plus macro F1 and accuracy."""
             # Extract logits and labels, then compute predicted label IDs
             predictions, labels = unpack_predictions(prediction)
@@ -265,7 +247,7 @@ def create_compute_metrics(task_config: TaskConfig):
             }
 
             return {
-                "f1": report["macro avg"]["f1-score"], 
+                "f1": report["macro avg"]["f1-score"],
                 "accuracy": report["accuracy"],
                 "weighted_f1": report["weighted avg"]["f1-score"],
                 "per_class_f1": per_class_f1
@@ -282,7 +264,7 @@ def create_compute_metrics(task_config: TaskConfig):
 def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetune_config: FinetuneConfig, dataset: DatasetDict, output_dir: Path, seed: int) -> dict[str, object]:
     """
     Fine-tune a CPT checkpoint on a single downstream task and evaluate it on the test split.
-    
+
     :param checkpoint_path: Path to the CPT checkpoint.
     :param task_config: TaskConfig for the task.
     :param finetune_config: FinetuneConfig with fine-tuning hyperparameters.
@@ -299,7 +281,7 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
     tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
     hf_logging.set_verbosity_warning()
 
-    def model_init():
+    def model_init() -> PreTrainedModel:
         """Load a CPT checkpoint with a newly initialised task-specific head."""
         kwargs = dict(
             num_labels=task_config.num_labels,
@@ -313,7 +295,7 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
             return AutoModelForTokenClassification.from_pretrained(checkpoint_path, **kwargs)
         else:
             return AutoModelForSequenceClassification.from_pretrained(checkpoint_path, **kwargs)
-        
+
     # Select the data collator for the downstream task
     if task_config.task_type == TaskType.TOKEN_CLASSIFICATION:
         data_collator = DataCollatorForTokenClassification(tokenizer)
@@ -327,7 +309,7 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
     # Configure W&B run name for this fine-tuning run
     if finetune_config.wandb_project:
         os.environ["WANDB_PROJECT"] = finetune_config.wandb_project
-        
+
     wandb_project = os.environ.get("WANDB_PROJECT")
     run_name = f"{step}-{task_config.task_name}-seed-{seed}" if wandb_project else None
 
@@ -396,7 +378,6 @@ def finetune_and_evaluate(checkpoint_path: Path, task_config: TaskConfig, finetu
 
 def main() -> None:
     """Parse CLI arguments and run fine-tuning across all checkpoints."""
-    load_dotenv()
     args = parse_args()
     set_reproducibility()
 
@@ -436,5 +417,5 @@ def main() -> None:
 
     logger.info(f"Fine-tuning and evaluation complete for {task_config.task_name}.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

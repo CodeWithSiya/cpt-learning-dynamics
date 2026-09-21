@@ -66,7 +66,7 @@ for model in "${MODELS[@]}"; do
 
             uv run python src/finetuning/aggregate.py \
                 --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
-                --task ${task} \
+                --task-config configs/evaluation/${task}.yaml \
                 --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/aggregated/${task}_aggregated.json
         done
     done

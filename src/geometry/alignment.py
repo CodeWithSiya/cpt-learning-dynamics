@@ -27,6 +27,7 @@ from src.geometry.embeddings import (
     embed_sentences,
     matched_cosine_similarities
 )
+from src.utils.extract import checkpoint_step, discover_checkpoints
 
 # Configure logging to show timestamps and log level
 logging.basicConfig(
@@ -76,29 +77,6 @@ def parse_args() -> Namespace:
         help=f"Number of sentences to embed per forward pass. Default: {DEFAULT_BATCH_SIZE}."
     )
     return parser.parse_args()
-
-def checkpoint_step(path: Path) -> int:
-    """Extract the training step number from a checkpoint directory name."""
-    return int(path.name.split("-")[1])
-
-def discover_checkpoints(checkpoint_dir: Path) -> list[Path]:
-    """
-    Discover all CPT checkpoints in a directory, sorted by step number.
-
-    :param checkpoint_dir: Path to directory containing checkpoint subfolders.
-    :return: Sorted list of checkpoint paths.
-    """
-    checkpoints = []
-
-    # Search for checkpoint directories that begin with 'step-'
-    for path in checkpoint_dir.iterdir():
-        if path.is_dir() and path.name.startswith("step-"):
-            checkpoints.append(path)
-
-    # Sort the checkpoints by step numbers
-    checkpoints.sort(key=checkpoint_step)
-
-    return checkpoints
 
 def compute_alignment_score(english_sentences: list[str], target_sentences: list[str],
                             model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, device: torch.device,

@@ -37,6 +37,7 @@ from transformers.trainer_utils import get_last_checkpoint
 
 from src.pretraining.config import ModelConfig
 from src.pretraining.schedule import compute_checkpoint_steps
+from src.utils.extract import checkpoint_step
 
 # Constant Values (MLM probability from Devlin et al. [2018])
 RANDOM_SEED = 42
@@ -148,10 +149,6 @@ def parse_args() -> Namespace:
     )
     return parser.parse_args() 
 
-def checkpoint_step(path: Path) -> int:
-    """Extract the training step number from a checkpoint directory name."""
-    return int(path.name.split("-")[1])
-
 def get_full_log_history(checkpoint_dir: Path) -> list[dict]:
     """
     Retrieve the complete log history from the most recent resumption checkpoint.
@@ -169,7 +166,7 @@ def get_full_log_history(checkpoint_dir: Path) -> list[dict]:
     if not checkpoints:
         return []
 
-    checkpoints.sort(key=checkpoint_step)  
+    checkpoints.sort(key=lambda path: checkpoint_step(path, prefix="checkpoint"))  
 
     # Get the training history fron the latest checkpoint
     latest_checkpoint = checkpoints[-1]
