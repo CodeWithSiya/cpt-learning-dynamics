@@ -94,7 +94,7 @@ def task_filename(task: str, language: str) -> str:
     Resolve a task to the aggregated results filename it was written under.
 
     News topic classification is language specific, so its results are stored
-    per language rather than under a single shared task name.
+    per language.
 
     :param task: Task name as used in this script, e.g. "ntc".
     :param language: Language code, e.g. "zul".
@@ -162,60 +162,17 @@ def series(aggregated: dict[int, dict], steps: list[int], key: str,
 
     for step in steps:
         entry = aggregated[step].get(key)
-        value = entry.get(class_name) if class_name is not None else entry
+
+        if class_name is not None:
+            value = entry.get(class_name) if entry is not None else None
+        else:
+            value = entry
         values.append(np.nan if value is None else float(value))
 
     return np.array(values, dtype=float)
 
-def plot_by_task(aggregated, models, languages, tasks, output_path: Path) -> None:
-    """
-    Plot overall F1 with rows for languages and columns for tasks, one line per
-    model, so models can be read against each other within a task.
-
-    :param aggregated: Mapping from (model, language, task) to aggregated results.
-    :param models: Models to draw as lines.
-    :param languages: Languages to draw as rows.
-    :param tasks: Tasks to draw as columns.
-    :param output_path: File path to save the figure to.
-    """
-    fig, axes = style.grid_figure(len(languages), len(tasks), row_labels=True, sharey="col")
-
-    for row, language in enumerate(languages):
-        for col, task in enumerate(tasks):
-            ax = axes[row][col]
-
-            for model in models:
-                results = aggregated.get((model, language, task))
-                if not results:
-                    continue
-
-                steps = sorted(results)
-                ax.plot(
-                    steps,
-                    series(results, steps, "overall_mean"),
-                    label=style.MODEL_DISPLAY_NAMES[model],
-                    color=style.MODEL_COLOURS[model],
-                )
-                style.configure_step_axis(ax, steps)
-
-    for col in range(len(tasks)):
-        style.configure_value_axis(axes[:, col])
-
-    style.label_grid(
-        axes,
-        column_titles=[TASK_DISPLAY_NAMES[task] for task in tasks],
-        xlabel=STEP_LABEL,
-        ylabels=VALUE_LABEL,
-        fig=fig,
-    )
-
-    style.finalise_grid(
-        fig, axes, output_path,
-        row_labels=[style.LANGUAGE_DISPLAY_NAMES[language] for language in languages],
-    )
-    logger.info(f"Saved downstream by-task grid to {output_path}")
-
-def plot_overall(aggregated, models, languages, tasks, output_path: Path) -> None:
+def plot_overall(aggregated: dict[tuple[str, str, str], dict[int, dict]], models: list[str],
+                 languages: list[str], tasks: list[str], output_path: Path) -> None:
     """
     Plot overall F1 with rows for languages and columns for models, one line per
     task, so a single model's dynamics can be read across all of its tasks.
@@ -246,7 +203,9 @@ def plot_overall(aggregated, models, languages, tasks, output_path: Path) -> Non
                 )
                 style.configure_step_axis(ax, steps)
 
-    style.configure_value_axis(axes.flat)
+    # Languages sit at different F1 levels, so each row is scaled independently
+    for row in range(len(languages)):
+        style.configure_value_axis(axes[row])
 
     style.label_grid(
         axes,
@@ -307,7 +266,8 @@ def group_series(aggregated: dict[int, dict], steps: list[int], group: str) -> n
 
     return np.array(values, dtype=float)
 
-def plot_grouped(aggregated, models, languages, task: str, output_path: Path) -> None:
+def plot_grouped(aggregated: dict[tuple[str, str, str], dict[int, dict]], models: list[str],
+                 languages: list[str], task: str, output_path: Path) -> None:
     """
     Plot one task's per-class F1 averaged into coarse groups, with rows for
     languages and columns for models.
@@ -354,7 +314,9 @@ def plot_grouped(aggregated, models, languages, task: str, output_path: Path) ->
 
             style.configure_step_axis(ax, steps)
 
-    style.configure_value_axis(axes.flat)
+    # Languages sit at different F1 levels, so each row is scaled independently
+    for row in range(len(languages)):
+        style.configure_value_axis(axes[row])
 
     style.label_grid(
         axes,
@@ -370,7 +332,7 @@ def plot_grouped(aggregated, models, languages, task: str, output_path: Path) ->
     )
     logger.info(f"Saved {TASK_DISPLAY_NAMES[task]} grouped grid to {output_path}")
 
-def class_colours(aggregated, languages, task: str) -> dict[str, tuple]:
+def class_colours(aggregated: dict[tuple[str, str, str], dict[int, dict]], languages: list[str], task: str) -> dict[str, tuple]:
     """
     Assign palette colours to display labels in row order, so the first language
     takes the first palette entries and a shared label keeps one colour.
@@ -396,7 +358,8 @@ def class_colours(aggregated, languages, task: str) -> dict[str, tuple]:
 
     return dict(zip(labels, style.categorical_colours(len(labels))))
 
-def plot_per_class(aggregated, models, languages, task: str, output_path: Path) -> None:
+def plot_per_class(aggregated: dict[tuple[str, str, str], dict[int, dict]], models: list[str],
+                   languages: list[str], task: str, output_path: Path) -> None:
     """
     Plot the per-class breakdown of one task, with rows for languages and columns
     for models, one line per class.
@@ -443,7 +406,9 @@ def plot_per_class(aggregated, models, languages, task: str, output_path: Path) 
 
             style.configure_step_axis(ax, steps)
 
-    style.configure_value_axis(axes.flat)
+    # Languages sit at different F1 levels, so each row is scaled independently
+    for row in range(len(languages)):
+        style.configure_value_axis(axes[row])
 
     style.label_grid(
         axes,
@@ -473,28 +438,23 @@ def main() -> None:
         logger.error(f"No aggregated results found under {results_dir}")
         return
 
-    plot_by_task(
-        aggregated, args.models, args.languages, args.tasks,
-        output_dir / "downstream_by_task.pdf"
-    )
-
     plot_overall(
         aggregated, args.models, args.languages, args.tasks,
         output_dir / "downstream_overall.pdf"
     )
 
-    # POS is shown grouped instead, its 17 tags being unreadable as separate lines
-    for task in (task for task in args.tasks if task != "pos"):
-        plot_per_class(
-            aggregated, args.models, args.languages, task,
-            output_dir / f"downstream_{task}_per_class.pdf"
-        )
-
-    if "pos" in args.tasks:
-        plot_grouped(
-            aggregated, args.models, args.languages, "pos",
-            output_dir / "downstream_pos_grouped.pdf"
-        )
+    # POS has too many tags to read individually, so its classes are grouped
+    for task in args.tasks:
+        if task == "pos":
+            plot_grouped(
+                aggregated, args.models, args.languages, task,
+                output_dir / "downstream_pos_grouped.pdf"
+            )
+        else:
+            plot_per_class(
+                aggregated, args.models, args.languages, task,
+                output_dir / f"downstream_{task}_per_class.pdf"
+            )
 
 if __name__ == "__main__":
     main()

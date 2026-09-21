@@ -9,9 +9,9 @@ import logging
 from argparse import Namespace
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-
 import style
+
+from src.utils.extract import checkpoint_step
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +20,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 GRID_COLUMNS = 5
+
+EPOCH_LABEL = "Epoch"
+LOSS_LABEL = "Loss"
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -45,24 +48,21 @@ def parse_args() -> Namespace:
         help="Seed to plot results for."
     )
     parser.add_argument(
-        "--model-name",
+        "--model",
         type=str,
         required=True,
-        help="Model name, used in the plot title and output filename."
+        choices=list(style.MODEL_DISPLAY_NAMES),
+        help="Model to plot, used in the figure title and output filename."
     )
     parser.add_argument(
         "--output-dir",
         type=str,
         required=True,
-        help="Directory to save the plot image to."
+        help="Directory to save the figure to."
     )
     return parser.parse_args()
 
-def checkpoint_step(path: Path) -> int:
-    """Extract the training step number from a checkpoint directory name."""
-    return int(path.name.split("-")[1])
-
-def load_checkpoint_results(results_dir: Path, task: str, seed: int):
+def load_checkpoint_results(results_dir: Path, task: str, seed: int) -> dict[int, list[dict]]:
     """
     Load fine-tuning results for a given task and seed, across all checkpoints.
 
@@ -87,25 +87,20 @@ def load_checkpoint_results(results_dir: Path, task: str, seed: int):
     logger.info(f"Loaded fine-tuning history for {len(results_by_step)} checkpoints.")
     return results_by_step
 
-def plot_finetune_grid(results_by_step: dict[int, list[dict]], task: str, model_name: str, output_path: Path) -> None:
+def plot_finetune_grid(results_by_step: dict[int, list[dict]], output_path: Path) -> None:
     """
-    Plot a grid of fine-tuning loss curves, one subplot per checkpoint.
+    Plot a grid of fine-tuning loss curves, one panel per checkpoint.
 
     :param results_by_step: Mapping from checkpoint step to fine-tuning log history.
-    :param task: Task name, used in the plot title.
-    :param model_name: Model name, used in the plot title.
-    :param output_path: File path to save the plot image to.
+    :param output_path: File path to save the figure to.
     """
     steps = sorted(results_by_step.keys())
-    num_checkpoints = len(steps)
+    num_rows = (len(steps) + GRID_COLUMNS - 1) // GRID_COLUMNS
 
-    num_cols = GRID_COLUMNS
-    num_rows = (num_checkpoints + num_cols - 1) // num_cols
-
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=(4 * num_cols, 3 * num_rows), squeeze=False)
+    fig, axes = style.grid_figure(num_rows, GRID_COLUMNS, sharex=True, sharey=False)
 
     for index, step in enumerate(steps):
-        row, col = divmod(index, num_cols)
+        row, col = divmod(index, GRID_COLUMNS)
         ax = axes[row][col]
 
         log_history = results_by_step[step]
@@ -115,30 +110,29 @@ def plot_finetune_grid(results_by_step: dict[int, list[dict]], task: str, model_
 
         if train_points:
             train_epochs, train_values = zip(*train_points)
-            ax.plot(train_epochs, train_values, color=style.PALETTE[0], label="Train")
+            ax.plot(train_epochs, train_values, label="Train", color=style.PALETTE[0])
 
         if eval_points:
             eval_epochs, eval_values = zip(*eval_points)
-            ax.plot(eval_epochs, eval_values, color=style.PALETTE[1], label="Val")
+            ax.plot(eval_epochs, eval_values, label="Validation", color=style.PALETTE[4])
 
-        ax.set_title(f"step-{step}", fontsize=9)
-        ax.tick_params(labelsize=7)
-        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.set_title(f"step-{step:,}")
 
-    for idx in range(num_checkpoints, num_rows * num_cols):
-        row, col = divmod(idx, num_cols)
+    # Blank out the unused panels in the final row
+    for index in range(len(steps), num_rows * GRID_COLUMNS):
+        row, col = divmod(index, GRID_COLUMNS)
         axes[row][col].axis("off")
 
-    handles, labels = axes[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper right", fontsize=9)
-    fig.supxlabel("Epoch")
-    fig.supylabel("Loss")
-    fig.suptitle(f"Fine-tuning Loss per Checkpoint: {model_name} ({task.upper()})", fontsize=13)
+    style.configure_value_axis(axes.flat)
 
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+    style.label_grid(
+        axes,
+        xlabel=EPOCH_LABEL,
+        ylabels=LOSS_LABEL,
+        fig=fig,
+    )
 
+    style.finalise_grid(fig, axes, output_path)
     logger.info(f"Saved fine-tuning grid plot to {output_path}")
 
 def main() -> None:
@@ -154,10 +148,10 @@ def main() -> None:
         logger.error(f"No results found for task '{args.task}', seed {args.seed} in {results_dir}")
         return
 
-    filename = args.model_name.lower().replace(" ", "_").replace("-", "_")
-    output_path = output_dir / f"{filename}_{args.task}_seed{args.seed}_finetune_grid.png"
+    filename = args.model.replace("-", "_")
+    output_path = output_dir / f"{filename}_{args.task}_seed{args.seed}_finetune_grid.pdf"
 
-    plot_finetune_grid(results_by_step, args.task, args.model_name, output_path)
+    plot_finetune_grid(results_by_step, output_path)
 
 if __name__ == "__main__":
     main()

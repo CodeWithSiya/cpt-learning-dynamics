@@ -10,6 +10,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.axes import Axes
 
 import style
 
@@ -97,7 +98,7 @@ def loss_series(log_history: list[dict], loss_type: str) -> tuple[list[int], lis
     steps, values = zip(*sorted(points))
     return list(steps), list(values)
 
-def configure_step_axis(ax, steps: list[int]) -> None:
+def configure_step_axis(ax: Axes, steps: list[int]) -> None:
     """
     Configure the checkpoint step axis.
 
@@ -110,7 +111,8 @@ def configure_step_axis(ax, steps: list[int]) -> None:
         ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
     )
 
-def plot_grid(log_histories, models, languages, output_path: Path) -> None:
+def plot_grid(log_histories: dict[tuple[str, str], list[dict]], models: list[str],
+              languages: list[str], output_path: Path) -> None:
     """
     Plot CPT loss with rows for languages and columns for loss types, one line per model.
 

@@ -46,14 +46,6 @@ declare -A LANGUAGE_TASKS=(
 # Seeds available for plotting
 ALL_SEEDS=(42 123 456 789 1738)
 
-# Display names used in plot titles
-declare -A MODEL_DISPLAY_NAMES=(
-    ["roberta"]="RoBERTa"
-    ["xlmr"]="XLMR"
-    ["nguni-xlmr"]="Nguni-XLMR"
-    ["afriberta"]="AfriBERTa"
-)
-
 # First script argument selects a single model; if omitted, loop through all models
 MODEL_ARG="$1"
 if [ -n "${MODEL_ARG}" ]; then
@@ -88,7 +80,7 @@ for model in "${MODELS[@]}"; do
                     --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
                     --task ${task} \
                     --seed ${seed} \
-                    --model-name "${MODEL_DISPLAY_NAMES[$model]}" \
+                    --model ${model} \
                     --output-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/plots/finetune
             done
         done

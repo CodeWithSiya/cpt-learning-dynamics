@@ -4,17 +4,30 @@ import os
 import shutil
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
 import scienceplots
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.transforms import Bbox
+from collections.abc import Iterable, Sequence
 from cycler import cycler
+from pathlib import Path
+from typing import Literal
+
+AxisShare = bool | Literal["all", "row", "col", "none"]
 
 # Figure widths in inches, measured from acmart's sigconf layout
 COLUMN_WIDTH = 3.335
 TEXT_WIDTH = 7.03
 
-PANEL_WIDTH = (TEXT_WIDTH - 0.62) / 4
-PANEL_ASPECT = 0.80
+# Grids are drawn wider than the text width and scaled down on inclusion, to buy room for tick labels
+GRID_WIDTH = 8.80
+GRID_SCALE = GRID_WIDTH / TEXT_WIDTH
+
+PANEL_ASPECT = 0.55
+MAX_PANEL_WIDTH = 2.40 * GRID_SCALE
 ROW_LABEL_WIDTH = 0.62
 
 PALETTE = [
@@ -22,11 +35,11 @@ PALETTE = [
     "#9d6ac7",  # purple
     "#feb876",  # peach-orange
     "#db7eb1",  # pink
-    "#56b4e9",  # sky blue 
+    "#2d72d9",  # blue
     "#00af81",  # green
-    "#745fc0",  # indigo
-    "#2d72d9",  # blue  
+    "#56b4e9",  # sky blue
     "#f0785c",  # coral
+    "#745fc0",  # indigo
     "#b85aa8",  # magenta
     "#35a6a0",  # turquoise
     "#8fba4a",  # yellow-green
@@ -57,11 +70,11 @@ plt.rcParams.update({
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
     "axes.prop_cycle": cycler(color=PALETTE),
-    "axes.linewidth": 0.6,
+    "axes.linewidth": 0.6 * GRID_SCALE,
     "axes.edgecolor": MUTED_INK,
     "axes.labelcolor": INK,
     "text.color": INK,
-    "lines.linewidth": 1.3,
+    "lines.linewidth": 1.55 * GRID_SCALE,
     "lines.solid_capstyle": "round",
     "axes.grid": False,
     "xtick.color": MUTED_INK,
@@ -74,8 +87,8 @@ plt.rcParams.update({
     "ytick.direction": "in",
     "xtick.minor.visible": False,
     "ytick.minor.visible": False,
-    "xtick.major.width": 0.6,
-    "ytick.major.width": 0.6,
+    "xtick.major.width": 0.6 * GRID_SCALE,
+    "ytick.major.width": 0.6 * GRID_SCALE,
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.02,
 })
@@ -94,46 +107,15 @@ else:
 
 plt.rcParams["figure.figsize"] = (COLUMN_WIDTH, COLUMN_WIDTH * 0.85)
 
-def figure_size(width: float, aspect: float = 0.85) -> tuple[float, float]:
-    """
-    Build a figure size from a target width.
-
-    :param width: Figure width in inches, typically COLUMN_WIDTH or TEXT_WIDTH.
-    :param aspect: Height as a fraction of the width.
-    :return: Figure size as a (width, height) pair.
-    """
-    return (width, width * aspect)
-
-def legend_below(fig, ax, ncol: int) -> None:
-    """
-    Place a single legend in a horizontal strip below the axes.
-
-    :param fig: Figure the legend belongs to.
-    :param ax: Axes supplying the legend handles.
-    :param ncol: Number of legend columns.
-    """
-    handles, labels = ax.get_legend_handles_labels()
-
-    fig.legend(
-        handles,
-        labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=ncol,
-        frameon=True,
-        fancybox=False,
-        edgecolor="0.8",
-    )
-
-MODELS = ["roberta", "xlmr", "nguni-xlmr", "afriberta"]
+MODELS = ["roberta", "xlmr", "afriberta", "nguni-xlmr"]
 
 MODEL_COLOURS = dict(zip(MODELS, PALETTE))
 
 MODEL_DISPLAY_NAMES = {
     "roberta": "RoBERTa",
     "xlmr": "XLM-R",
-    "nguni-xlmr": "Nguni-XLMR",
     "afriberta": "AfriBERTa",
+    "nguni-xlmr": "Nguni-XLMR",
 }
 
 TASKS = ["ner", "pos", "ntc"]
@@ -188,8 +170,20 @@ def balanced_ncol(n: int, max_cols: int) -> int:
 
     return max(range(2, max_cols + 1), key=lambda cols: (-((-n % cols)), cols))
 
+def panel_width(ncols: int, row_labels: bool) -> float:
+    """
+    Width of one panel, sized to fill the text width but capped so grids with
+    few columns stay a sensible shape rather than running very wide.
+
+    :param ncols: Number of panel columns.
+    :param row_labels: Whether a left margin is reserved for row labels.
+    :return: Panel width in inches.
+    """
+    available = GRID_WIDTH - (ROW_LABEL_WIDTH if row_labels else 0.0)
+    return min(MAX_PANEL_WIDTH, available / ncols)
+
 def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
-                sharex: bool | str = True, sharey: bool | str = "row"):
+                sharex: AxisShare = True, sharey: AxisShare = "row") -> tuple[Figure, np.ndarray]:
     """
     Create a panel grid. Every figure spans the text width and every panel is the
     same size; grids with few columns are centred rather than stretched.
@@ -201,8 +195,8 @@ def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
     :param sharey: Axis sharing for the y axis, e.g. "row", "col", True or False.
     :return: The figure and its 2D array of axes.
     """
-    width = TEXT_WIDTH
-    height = nrows * (PANEL_WIDTH * PANEL_ASPECT + 0.35)
+    width = GRID_WIDTH
+    height = nrows * (panel_width(ncols, row_labels) * PANEL_ASPECT + 0.35 * GRID_SCALE)
 
     fig, axes = plt.subplots(
         nrows,
@@ -223,10 +217,10 @@ def grid_figure(nrows: int, ncols: int, row_labels: bool = False,
 # Longest x label that still fits under every column of a wide grid
 MAX_REPEATED_XLABEL = 12
 
-def label_grid(axes, column_titles: list[str] | None = None,
+def label_grid(axes: np.ndarray, column_titles: list[str] | None = None,
                xlabel: str | None = None,
                ylabels: list[str] | str | None = None,
-               fig=None) -> None:
+               fig: Figure | None = None) -> None:
     """
     Label a panel grid once around its edges rather than per panel: titles along
     the top, the measured quantity down the left, the grouping down the right and
@@ -252,9 +246,8 @@ def label_grid(axes, column_titles: list[str] | None = None,
                 axes[nrows - 1][col].set_xlabel(xlabel)
 
     if ylabels is not None:
-        if isinstance(ylabels, str):
-            ylabels = [ylabels] * nrows
-        for row, label in enumerate(ylabels):
+        row_labels = [ylabels] * nrows if isinstance(ylabels, str) else ylabels
+        for row, label in enumerate(row_labels):
             axes[row][0].set_ylabel(label)
 
 def swatch_handles(handles: list) -> list:
@@ -266,7 +259,7 @@ def swatch_handles(handles: list) -> list:
     """
     return [Patch(facecolor=handle.get_color(), edgecolor="none") for handle in handles]
 
-def legend_entries(axes) -> tuple[list, list]:
+def legend_entries(axes: np.ndarray) -> tuple[list, list]:
     """
     Collect one legend entry per distinct label across every panel in a grid.
 
@@ -298,7 +291,7 @@ def row_bands(labels: list[str]) -> list[tuple[str, list[int]]]:
 
     return bands
 
-def draw_row_labels(fig, axes, labels: list[str], margin: float, left: float) -> None:
+def draw_row_labels(fig: Figure, axes: np.ndarray, labels: list[str], margin: float, left: float) -> None:
     """
     Draw a horizontal label beside each row, in the margin left of the y labels.
 
@@ -322,7 +315,7 @@ def draw_row_labels(fig, axes, labels: list[str], margin: float, left: float) ->
             fontsize=plt.rcParams["axes.labelsize"],
         )
 
-def finalise_grid(fig, axes, output_path, row_labels: list[str] | None = None,
+def finalise_grid(fig: Figure, axes: np.ndarray, output_path: Path, row_labels: list[str] | None = None,
                   ncol: int | None = None, max_legend_cols: int | None = None) -> None:
     """
     Lay out a panel grid, add its shared legend strip underneath and save it.
@@ -343,7 +336,8 @@ def finalise_grid(fig, axes, output_path, row_labels: list[str] | None = None,
 
     legend_rows = -(-len(labels) // ncol)
 
-    supxlabel = fig._supxlabel
+    # matplotlib exposes the text only as a private attribute; the public getter returns a string
+    supxlabel = getattr(fig, "_supxlabel", None)
     legend_height = 0.20 * legend_rows + 0.10
     label_height = 0.24 if supxlabel is not None else 0.0
 
@@ -352,7 +346,9 @@ def finalise_grid(fig, axes, output_path, row_labels: list[str] | None = None,
     legend_fraction = legend_height / fig.get_figheight()
     label_fraction = label_height / fig.get_figheight()
 
-    content = axes.shape[1] * PANEL_WIDTH + (ROW_LABEL_WIDTH if row_labels else 0.0)
+    content = axes.shape[1] * panel_width(axes.shape[1], bool(row_labels)) + (
+        ROW_LABEL_WIDTH if row_labels else 0.0
+    )
     margin = max(0.0, 0.5 * (fig.get_figwidth() - content)) / fig.get_figwidth()
     left = ROW_LABEL_WIDTH / fig.get_figwidth() if row_labels else 0.0
 
@@ -386,31 +382,36 @@ def finalise_grid(fig, axes, output_path, row_labels: list[str] | None = None,
     ))
     plt.close(fig)
 
-def configure_step_axis(ax, steps) -> None:
+# Ticks for a CPT step axis spanning the full run; shorter ranges use an automatic locator
+STEP_TICKS = [0, 50_000, 100_000, 150_000, 200_000]
+
+def configure_step_axis(ax: Axes, steps: Sequence[int]) -> None:
     """
     Configure a continued pretraining step axis, shared by every dynamics panel.
 
     :param ax: Axes to configure.
     :param steps: Checkpoint steps being plotted.
     """
-    import matplotlib.ticker as ticker
+    low, high = min(steps), max(steps)
+    ax.set_xlim(low, high)
 
-    ax.set_xlim(min(steps), max(steps))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3, steps=[1, 2, 5, 10]))
+    if low == STEP_TICKS[0] and high == STEP_TICKS[-1]:
+        ax.xaxis.set_major_locator(ticker.FixedLocator(STEP_TICKS))
+    else:
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3, steps=[1, 2, 5, 10]))
+
     ax.xaxis.set_major_formatter(
         ticker.FuncFormatter(lambda x, _: f"{x / 1000:g}k" if x >= 1000 else f"{int(x)}")
     )
 
-def tick_formatter(ticks) -> "ticker.FuncFormatter":
+def tick_formatter(ticks: Sequence[float]) -> ticker.FuncFormatter:
     """
-    Format ticks to a common number of decimals, dropping the leading zero from
-    values below one, as is conventional for bounded quantities.
+    Format ticks to a common number of decimals, keeping the leading zero on
+    values below one.
 
     :param ticks: Tick values the axis will show.
     :return: Formatter for those ticks.
     """
-    import matplotlib.ticker as ticker
-
     decimals = 0
     for value in ticks:
         for places in range(7):
@@ -418,13 +419,9 @@ def tick_formatter(ticks) -> "ticker.FuncFormatter":
                 decimals = max(decimals, places)
                 break
 
-    def format_tick(value, _):
-        text = f"{value:.{decimals}f}"
-        return text.replace("0.", ".", 1) if abs(value) < 1 and "0." in text else text
+    return ticker.FuncFormatter(lambda value, _: f"{value:.{decimals}f}")
 
-    return ticker.FuncFormatter(format_tick)
-
-def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
+def configure_value_axis(group_axes: Iterable[Axes], cap_at_one: bool = True) -> None:
     """
     Give every panel plotting the same quantity one common y scale, fitted to the
     data rather than anchored at zero, so variation fills the panel.
@@ -432,8 +429,6 @@ def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
     :param group_axes: Axes sharing a quantity, across rows as well as columns.
     :param cap_at_one: Whether the metric cannot exceed one, as F1 and cosine cannot.
     """
-    import matplotlib.ticker as ticker
-
     group_axes = list(group_axes)
     drawn = [ax for ax in group_axes if ax.has_data()]
     if not drawn:
@@ -446,18 +441,23 @@ def configure_value_axis(group_axes, cap_at_one: bool = True) -> None:
     bottom = low - pad
     top = high + pad
 
-    if low >= 0.0:
-        bottom = max(bottom, 0.0)
-
     if cap_at_one:
         top = min(top, 1.0)
 
     locator = ticker.MaxNLocator(nbins=4, steps=[1, 2, 2.5, 5, 10])
-    formatter = tick_formatter(
-        [t for t in locator.tick_values(bottom, top) if bottom <= t <= top]
-    )
+    ticks = [t for t in locator.tick_values(bottom, top) if bottom <= t <= top]
+
+    # A tick on the axis floor collides with the x axis, so open the limits past the outermost ticks
+    if len(ticks) >= 2:
+        clearance = 0.30 * (ticks[1] - ticks[0])
+        bottom = min(bottom, ticks[0] - clearance)
+
+        if not (cap_at_one and top >= 1.0):
+            top = max(top, ticks[-1] + clearance)
+
+    formatter = tick_formatter(ticks)
 
     for ax in group_axes:
-        ax.yaxis.set_major_locator(locator)
+        ax.yaxis.set_major_locator(ticker.FixedLocator(ticks))
         ax.yaxis.set_major_formatter(formatter)
         ax.set_ylim(bottom, top)

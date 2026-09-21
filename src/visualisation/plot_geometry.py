@@ -28,17 +28,12 @@ LANGUAGE_SUBSETS = {
 
 METRIC_LABELS = {
     "matched_cosine_similarity": "Cosine similarity",
-    "baseline_cosine_similarity": "Cosine similarity",
-    "cosine_gap": "Cosine gap",
-    "p_at_1_english_to_target": "P@1",
-    "p_at_1_target_to_english": "P@1",
     "iso_score_shared": "IsoScore",
 }
 
-DEFAULT_METRICS = ["baseline_cosine_similarity", "iso_score_shared"]
+DEFAULT_METRICS = ["matched_cosine_similarity", "iso_score_shared"]
 
 LAYER_LABEL = "Layer"
-STEP_LABEL = "CPT Step"
 
 def parse_args() -> Namespace:
     """Parse command-line arguments."""
@@ -138,18 +133,6 @@ def layer_series(step_results: dict, metric: str) -> np.ndarray:
     values = step_results.get(metric, [])
     return np.array([np.nan if value is None else float(value) for value in values], dtype=float)
 
-def step_series(results: dict[int, dict], steps: list[int], metric: str) -> np.ndarray:
-    """
-    Read one metric across checkpoint steps as a float array.
-
-    :param results: Mapping from checkpoint step to alignment results.
-    :param steps: Checkpoint steps to read, in plotting order.
-    :param metric: Which metric field to read.
-    :return: Float array of the same length as steps.
-    """
-    values = [results[step].get(metric) for step in steps]
-    return np.array([np.nan if value is None else float(value) for value in values], dtype=float)
-
 def step_label(step: int) -> str:
     """
     Format a checkpoint step for a legend entry.
@@ -159,7 +142,8 @@ def step_label(step: int) -> str:
     """
     return f"{step / 1000:g}k" if step >= 1000 else f"{step}"
 
-def plot_layerwise(layerwise, models, languages, metrics, output_path: Path) -> None:
+def plot_layerwise(layerwise: dict[tuple[str, str], dict[int, dict]], models: list[str],
+                   languages: list[str], metrics: list[str], output_path: Path) -> None:
     """
     Plot layer-wise profiles with one row per metric and language pairing and one
     column per model, drawing a line for each continued pretraining checkpoint.
@@ -170,10 +154,13 @@ def plot_layerwise(layerwise, models, languages, metrics, output_path: Path) -> 
     :param metrics: Metrics to draw as row groups.
     :param output_path: File path to save the figure to.
     """
-    rows = [(metric, language) for language in languages for metric in metrics]
+    rows = [(metric, language) for metric in metrics for language in languages]
 
     all_steps = sorted({step for results in layerwise.values() for step in results})
     colours = dict(zip(all_steps, style.categorical_colours(len(all_steps))))
+    if all_steps:
+        # Draw the final checkpoint in the palette's lighter blue so it stays legible
+        colours[all_steps[-1]] = style.PALETTE[6]
 
     fig, axes = style.grid_figure(
         len(rows), len(models), row_labels=True, sharex="col", sharey="row"
@@ -224,50 +211,6 @@ def plot_layerwise(layerwise, models, languages, metrics, output_path: Path) -> 
     )
     logger.info(f"Saved layer-wise geometry grid to {output_path}")
 
-def plot_checkpoints(alignment, models, languages, metrics, output_path: Path) -> None:
-    """
-    Plot geometry against continued pretraining step, with one row per metric and
-    one column per language, drawing a line for each model.
-
-    :param alignment: Mapping from (model, language) to alignment results.
-    :param models: Models to draw as lines.
-    :param languages: Languages to draw as columns.
-    :param metrics: Metrics to draw as rows.
-    :param output_path: File path to save the figure to.
-    """
-    fig, axes = style.grid_figure(len(metrics), len(languages))
-
-    for row, metric in enumerate(metrics):
-        for col, language in enumerate(languages):
-            ax = axes[row][col]
-
-            for model in models:
-                results = alignment.get((model, language))
-                if not results:
-                    continue
-
-                steps = sorted(results)
-                ax.plot(
-                    steps,
-                    step_series(results, steps, metric),
-                    label=style.MODEL_DISPLAY_NAMES[model],
-                    color=style.MODEL_COLOURS[model],
-                )
-                style.configure_step_axis(ax, steps)
-
-        style.configure_value_axis(axes[row])
-
-    style.label_grid(
-        axes,
-        column_titles=[style.LANGUAGE_DISPLAY_NAMES[language] for language in languages],
-        xlabel=STEP_LABEL,
-        ylabels=[METRIC_LABELS[metric] for metric in metrics],
-        fig=fig,
-    )
-
-    style.finalise_grid(fig, axes, output_path)
-    logger.info(f"Saved checkpoint-wise geometry grid to {output_path}")
-
 def main() -> None:
     """Main entry point for plotting representation geometry."""
     args = parse_args()
@@ -277,23 +220,15 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     layerwise = load_all(results_dir, args.models, args.languages, "layerwise")
-    alignment = load_all(results_dir, args.models, args.languages, "alignment")
 
-    if not layerwise and not alignment:
+    if not layerwise:
         logger.error(f"No geometry results found under {results_dir}")
         return
 
-    if layerwise:
-        plot_layerwise(
-            layerwise, args.models, args.languages, args.metrics,
-            output_dir / "geometry_layerwise.pdf"
-        )
-
-    if alignment:
-        plot_checkpoints(
-            alignment, args.models, args.languages, args.metrics,
-            output_dir / "geometry_checkpoints.pdf"
-        )
+    plot_layerwise(
+        layerwise, args.models, args.languages, args.metrics,
+        output_dir / "geometry_layerwise.pdf"
+    )
 
 if __name__ == "__main__":
     main()

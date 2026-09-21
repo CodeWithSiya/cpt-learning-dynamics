@@ -31,6 +31,30 @@ module load python/miniconda3-py3.12
 cd /home/mdnsiy014/cpt-learning-dynamics
 uv sync --frozen
 
+# All models and languages available for plotting
+ALL_MODELS=("roberta" "xlmr" "nguni-xlmr" "afriberta")
+ALL_LANGUAGES=("xho" "zul")
+
+# Evaluation tasks available for each language
+declare -A LANGUAGE_TASKS=(
+    ["xho"]="ner pos ntc_xho"
+    ["zul"]="ner pos ntc_zul"
+)
+
+# Aggregate across seeds first, since the figures read the aggregated results
+for model in "${ALL_MODELS[@]}"; do
+    for language in "${ALL_LANGUAGES[@]}"; do
+        for task in ${LANGUAGE_TASKS[$language]}; do
+            echo "=== Aggregating ${task} (${language}) results for ${model} ==="
+
+            uv run python src/finetuning/aggregate.py \
+                --results-dir ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/finetuning \
+                --task-config configs/evaluation/${task}.yaml \
+                --output ${SCRATCH}/cpt-learning-dynamics/results/${model}-large/${language}/aggregated/${task}_aggregated.json
+        done
+    done
+done
+
 # Every figure here is a grid spanning all models and languages at once, so
 # there is nothing to loop over; any subset is selected with the flags below.
 echo "=== Plotting downstream result grids ==="
