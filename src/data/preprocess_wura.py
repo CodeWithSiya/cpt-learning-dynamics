@@ -8,7 +8,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from datasets import Dataset, load_from_disk
-from transformers import AutoTokenizer, PreTrainedTokenizerBase, logging as hf_logging
+from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase, logging as hf_logging
 
 from src.pretraining.config import ModelConfig
 
@@ -66,7 +66,7 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
     :param num_proc: Number of processes used for preprocessing.
     :return: Dataset of fixed-length token id chunks.
     """
-    def _tokenize(examples: dict[str, list[str]]):
+    def _tokenize(examples: dict[str, list[str]]) -> BatchEncoding:
         """Join headline and content, then tokenize for MLM pretraining."""
         texts = [
             f"{headline}\n\n{content}"
@@ -74,7 +74,7 @@ def tokenize_and_chunk(dataset: Dataset, tokenizer: PreTrainedTokenizerBase, blo
         ]
         return tokenizer(texts, truncation=False, return_special_tokens_mask=True)
 
-    def _chunk(examples: dict[str, list[list[int]]]):
+    def _chunk(examples: dict[str, list[list[int]]]) -> dict[str, list[list[int]]]:
         """Concatenate and chunk tokenized sequences into fixed-length blocks."""
         # Concatenate examples into one sequence
         concatenated = {k: sum(examples[k], []) for k in examples.keys()}
