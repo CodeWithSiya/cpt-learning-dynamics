@@ -237,3 +237,6 @@ download_plots.sh
 
 # Results
 results
+
+# MacOS
+.DS_Store
